@@ -15,12 +15,11 @@
 ;      Path and filename of input file.
 ;    outfile: in, required, type=string
 ;      Path and filename of output file.
-;    gcfile: in, required, type=string
+;    tcfile: in, required, type=string
 ;      Path and filename of telluric correction spectrum.
 ;
 ; :Keywords:
 ;    amcor: in, optional, type=double
-;    wvcor: 
 ;    varnorm: in, optional, type=double
 ;    
 ; :Author:

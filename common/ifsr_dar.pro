@@ -34,7 +34,7 @@
 ;      Threshold in DQ plane for assigning a pixel good/bad status. Greater 
 ;      than dqthresh means bad, less than or equal to dqthresh is good. Bad
 ;      pixels are set to DQ = 1.
-;    lamcuts: in, optional, type=dblarr(2,nregions)
+;    lamcuts: in, optional, type=dblarr(2\,nregions)
 ;      Lower and upper limits of wavelength regions to ignore in determining 
 ;      DAR. E.g., [[5000,5005],[6800,6850],...]
 ;    lamref: in, optional, type=double, default=6300
@@ -92,6 +92,7 @@
 ;
 ;-
 pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
+             dqthresh=dqthresh,$
              lamcuts=lamcuts,lamref=lamref,$
              nodarcor=nodarcor,sigcut=sigcut,$
              xranplot=xranplot,xranfit=xranfit,$
