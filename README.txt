@@ -31,7 +31,8 @@ Finally, IFSRED contains some GMOS-specific software:
 REQUIREMENTS
 -------------------------------------------------------------------------
 
-IDL (tested on v8.3)
+IDL (tested on v8.3, but probably backwards compatible with some older
+versions)
 
 IDL libraries:
 - IFSFIT
