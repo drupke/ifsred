@@ -2,19 +2,20 @@
 ;
 ;+
 ;
-; Mosaic data cubes for individual science exposures into a single data cube.
-; Accounts for shifts due to dithering, etc., using peaks determined with 
-; IFSR_DAR and written to the image headers as XPEAK and YPEAK. The data, 
-; variance, and data quality are interpolated to a common grid using INTERPOLATE
-; and bilinear interpolation, and median-combined. The DQ plane is applied
-; after interpolation but before median-combining.
+; Mosaic data cubes for individual science exposures into a single
+; data cube.  Accounts for shifts due to dithering, etc., using peaks
+; determined with IFSR_DAR and written to the image headers as XPEAK
+; and YPEAK. The data, variance, and data quality are interpolated to
+; a common grid using INTERPOLATE and bilinear interpolation, and
+; median-combined. The DQ plane is applied after interpolation but
+; before median-combining.
 ;
 ; :Categories:
 ;    IFSRED
 ;
 ; :Returns:
-;    Combined data cube. Header of cube is the same as the header of the first
-;    exposure in the file list.
+;    Combined data cube. Header of cube is the same as the header of
+;    the first exposure in the file list.
 ;    
 ; :Params:
 ;    infiles: in, required, type=strarr
@@ -26,7 +27,8 @@
 ;    indir: in, optional, type=string
 ;      Directory where input files are located.
 ;    nocenter: in, optional, type=byte
-;      Do not center the peak in the output data cube. Default is to center it.
+;      Do not center the peak in the output data cube. Default is to
+;      center it.
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -41,6 +43,7 @@
 ;      2010jun02, DSNR, created
 ;      2014feb06, DSNR, complete rewrite for ease of use/customization;
 ;                       added detailed documentation
+;      2014aprXY, DSNR, fixed bug in call to SXPAR
 ;
 ; :Copyright:
 ;    Copyright (C) 2014 David S. N. Rupke
@@ -88,8 +91,15 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter
      writefits,outfile,cube.phu,outheader.phu
      
 ;    Fitted galaxy center
-     xcc[i] = sxpar(header.phu,'XPEAK',/silent) - 1
-     ycc[i] = sxpar(header.phu,'YPEAK',/silent) - 1
+     xcc[i] = sxpar(header.phu,'XPEAK',/silent,count=ctx) - 1
+     ycc[i] = sxpar(header.phu,'YPEAK',/silent,count=cty) - 1
+     if ctx eq 0 OR cty eq 0 then begin
+;       Check science header if it's missing from PHU
+        xcc[i] = sxpar(header.dat,'XPEAK','exposure'+string(i+1,format='(I0)'),$
+                       /silent) - 1
+        ycc[i] = sxpar(header.dat,'YPEAK','exposure'+string(i+1,format='(I0)'),$
+                       /silent) - 1
+     endif
 ;    Residual from nearest integer pixel
      xccd[i] = xcc[i] - floor(xcc[i])
      yccd[i] = ycc[i] - floor(ycc[i])

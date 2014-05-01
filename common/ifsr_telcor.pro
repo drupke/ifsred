@@ -6,7 +6,7 @@
 ;
 ; :Categories:
 ;    IFSRED
-;
+ ;
 ; :Returns:
 ;    Rebinned data cube.
 ;
@@ -19,8 +19,15 @@
 ;      Path and filename of telluric correction spectrum.
 ;
 ; :Keywords:
-;    amcor: in, optional, type=double
-;    varnorm: in, optional, type=double
+;    amcor: in, optional, type=double, default=1
+;      Multiplier to the absorption optical depth to either increase
+;      or decrease correction. Higher amcor means airmass in data is
+;      higher than in the reference data. This is equal to the
+;      airmass ratio of the data and reference data.
+;    varnorm: in, optional, type=double, default=1
+;      Multiplier to the output variance to bias subsequent fits away
+;      from telluric regions. The multiplier is applied to regions
+;      where the input telluric correction spectrum is <1.
 ;    
 ; :Author:
 ;    David S. N. Rupke::
@@ -36,6 +43,7 @@
 ;      2011may27, DSNR, fixed variance treatment; added AM correction
 ;      2014feb07, DSNR, complete rewrite for ease of use/customization;
 ;                       added detailed documentation
+;      2014may01, DSNR, updated documentation
 ;
 ; :Copyright:
 ;    Copyright (C) 2014 David S. N. Rupke
