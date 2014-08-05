@@ -19,13 +19,16 @@ IFSRED also contains a sky-subtraction routine designed specifically
 to deal with GMOS data; however, this can be easily modified for any
 instrument.
 
-Finally, IFSRED contains some GMOS-specific software:
+Finally, IFSRED contains some GMOS- and NIFS-specific software:
 
 - Drop-in replacements for GFEXTRACT, GFTRANSFORM, GMOSAIC, and
   GSCALIBRATE in the v1.12 release of the Gemini IRAF package. These
   permit the propagation of a variance plane.
 - A routine to create a map of the GMOS image plane prior to
   resampling from hexagonal to square pixels.
+- Routine to remove scattered light from NIFS data.
+- Routines to align, DAR-correct, and merge NIFS data. Starts with
+  data prior to processing by NIFCUBE to allow variance propagation.
 
 -------------------------------------------------------------------------
 REQUIREMENTS
