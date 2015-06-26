@@ -162,6 +162,10 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter
   newyran = double([round(min(yarrc))-1,round(max(yarrc))+1])
   newrows = fix(newyran[1]-newyran[0]+2)
 
+;; Enforce odd # of columns and rows
+;  if not newcols then newcols+=1
+;  if not newrows then newrows+=1
+
 ; Center galaxy in new grid ...
   if ~ keyword_set(nocenter) then begin
      coloff = round(double(newcols/2d))-1

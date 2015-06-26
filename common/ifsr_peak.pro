@@ -22,9 +22,14 @@
 ; :Keywords:
 ;    circ: in, optional, type=byte
 ;      Enforce fitting of a Gaussian symmetric in x and y.
+;    header: in, optional, type=structure
+;      Header structure (output from IFSF_READCUBE) used for output file
+;      if re-writing header with new XPEAK, YPEAK.
 ;    indrange: in, optional, type=byte
 ;      Give range for wavelength region to fit as indices rather
 ;      than actual wavelengths. Indices are put in lamrange parameter.
+;    outfile: in, optional, type=string
+;      Optional output filename if re-writing header with new XPEAK, YPEAK.
 ;    quiet: in, optional, type=byte
 ;      Suppress output of centroids and half-widths to terminal.
 ;    xranfit: in, optional, type=dblarr(2)
@@ -46,6 +51,7 @@
 ;      2011may10, DSNR, improved rejection of outliers
 ;      2014feb06, DSNR, complete rewrite for ease of use/customization;
 ;                       added detailed documentation
+;      2015may18, DSNR, added option to re-write header
 ;                       
 ; :Copyright:
 ;    Copyright (C) 2014 David S. N. Rupke
@@ -66,7 +72,7 @@
 ;
 ;-
 function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
-                   xranfit=xranfit,yranfit=yranfit
+                   xranfit=xranfit,yranfit=yranfit,header=header,outfile=outfile
 
   if ~ keyword_set(circ) then circular=0 else circular=1
 
@@ -132,6 +138,27 @@ function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
      print,'X/Y-widths: ',xhw,' / ',yhw,format='(A0,D0.2,A0,D0.2)'
   endif
 
+;
+;; Re-write header with new XPEAK/YPEAK to new output file
+;
+  if keyword_set(outfile) AND keyword_set(header) then begin
+
+
+;    Add peak locations to header. SXADDPAR increases the size of the header, 
+;    which confuses the structure, so we have to define a new array to hold the 
+;    new header.
+     newheader_phu = header.phu
+     sxaddpar,newheader_phu,'XPEAK',xc,'Column of peak flux (pixels)'
+     sxaddpar,newheader_phu,'YPEAK',yc,'Row of peak flux (pixels)'
+
+     writefits,outfile,cube.phu,newheader_phu
+     writefits,outfile,cube.dat,header.dat,/append
+     writefits,outfile,cube.var,header.var,/append
+     writefits,outfile,cube.dq,header.dq,/append
+
+  endif
+
   return,[xc,yc,xhw,yhw]
+
 
 end

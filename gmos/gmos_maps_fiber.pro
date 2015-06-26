@@ -30,6 +30,8 @@
 ;      Number of colorbar divisions
 ;    cbform: in, optional, type=string
 ;      Formatting string for colorbar labels
+;    dolab: in, optional, type=byte
+;      Add spaxel labels (indices)
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -43,6 +45,7 @@
 ;    ChangeHistory::
 ;      2010jun01, DSNR, created
 ;      2014jan31, DSNR, added detailed documentation
+;      2015jan05, DSNR, added option for spaxel labels
 ;                       
 ; :Copyright:
 ;    Copyright (C) 2014 David S. N. Rupke
@@ -62,7 +65,8 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro gmos_maps_fiber,nslits,z,x,y,outfile,zran=zran,ncbdiv=ncbdiv,cbform=cbform
+pro gmos_maps_fiber,nslits,z,x,y,outfile,zran=zran,ncbdiv=ncbdiv,cbform=cbform,$
+                    dolab=dolab
 
   if ~keyword_set(zran) then zran=[min(z),max(z)]
   if ~keyword_set(ncbdiv) then ncbdiv=4
@@ -93,6 +97,8 @@ pro gmos_maps_fiber,nslits,z,x,y,outfile,zran=zran,ncbdiv=ncbdiv,cbform=cbform
      color = byte((z[i]-zran[0])/(zran[1]-zran[0])*255d)
      usersymbol,'HEXAGON2',size=1.75,_extra={color:color,fill:1}
      oplot,[x[i]],[y[i]],psym=8,color=color
+     if keyword_set(dolab) then $
+        cgtext,[x[i]],[y[i]],string(i+1,format='(I0)'),chars=0.5,align=0.5
   endfor
 
   ticknames = string(dindgen(ncbdiv+1)*dzran/ncbdiv - $

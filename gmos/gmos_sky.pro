@@ -30,6 +30,8 @@
 ;      flux. Outliers are replaced with the mean value.
 ;    noshift: in, optional, type=byte
 ;      Do not apply velocity shifts.
+;    plotlab: in, optional, type=byte
+;      Add index labels to spaxels in plots
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -47,9 +49,11 @@
 ;      2014jan31, DSNR, complete rewrite for ease of use/customization; 
 ;                       added detailed documentation;
 ;                       automated stitching of sky and data in plots 
+;      2015jan05, DSNR, added option for spaxel labels in plots; revamped
+;                       output stats
 ;
 ; :Copyright:
-;    Copyright (C) 2014 David S. N. Rupke
+;    Copyright (C) 2014-2015 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -66,13 +70,23 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift
+pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,plotlab=plotlab
+
+  if keyword_set(plotlab) then dolab=1b else dolab=0b
 
   fwhmtosig = 2d*sqrt(2d*alog(2d))
 
 ; Get data and fit results
   ftab_ext,datfile,[1,2,3,5],ap_mdf,x,y,beam
   restore,file=fitfile
+
+; Strip ".fits" from input data file
+  fitspos = strpos(datfile,'.fits')
+  if fitspos ne -1 then datfileuse=strmid(datfile,0,fitspos) $
+  else datfileuse=datfile
+
+; Open file for stats
+  openw,lunstats,datfileuse+'_skyline_stats.txt',/get_lun
 
 ; Get wavelength of sky line used in fit
   linelist = ifsf_linelist(skyline)
@@ -106,7 +120,14 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift
   xmean = mean(x)
   ihi = where(x gt xmean,cthi)
   ilo = where(x lt xmean,ctlo)
-  if cthi gt ctlo then isky = ilo else isky = ihi ; which section is the sky?
+  ; which section is the sky?
+  if cthi gt ctlo then begin
+    isky = ilo
+    isci = ihi
+  endif else begin
+    isky = ihi
+    isci = ilo
+  endelse
   xjoinlo = max(x[ilo])
   xdiff = xjoinlo - max(x[where(x lt xmean AND x ne xjoinlo)])
   xjoinhi = min(x[ihi])
@@ -118,47 +139,91 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift
   medfwhm1 = median(fwhm_all[i1nz])
   medflux1 = median(flux_all[i1nz])
   rmsvel1 = sqrt(median((vel_all[i1nz]-medvel1)^2d))
+  rmsfwhm1 = sqrt(median((fwhm_all[i1nz]-medfwhm1)^2d))
+  rmsflux1 = sqrt(median((flux_all[i1nz]-medflux1)^2d))
   ibad1 = cmset_op(i1nz,'AND',where(abs(vel_all-medvel1) $
                                     gt sigrej*rmsvel1),count=nbad1)
   vel_all[ibad1] = medvel1
   fwhm_all[ibad1] = medfwhm1
   flux_all[ibad1] = medflux1
-  print,'Median velocity shift in slit 1: ',medvel1,format='(A0,I0)'
-  print,'RMS velocity deviation in slit 1: ',rmsvel1,format='(A0,D0.1)'
-  print,'No. pts. replaced in slit 1: ',nbad1,format='(A0,I0)'
+  printf,lunstats,'------'
+  printf,lunstats,'SLIT 1'
+  printf,lunstats,'------'
+  printf,lunstats,'VEL  median / RMS / med/RMS: ',$
+                  medvel1,rmsvel1,rmsvel1/medvel1,$
+                  format='(A-30,I10,D10.1,D10.3)'
+  printf,lunstats,'FWHM median / RMS / med/RMS: ',$
+                  medfwhm1,rmsfwhm1,rmsfwhm1/medfwhm1,$
+                  format='(A-30,I10,D10.1,D10.3)'
+  printf,lunstats,'FLUX median / RMS / med/RMS: ',$
+                  medflux1,rmsflux1,rmsflux1/medflux1,$
+                  format='(A-30,E10.2,E10.2,D10.3)'
+  printf,lunstats,'No. pts. replaced: ',nbad1,format='(A-25,I0)'
+
   if nslits eq 2 then begin
      medvel2 = median(vel_all[i2nz])
      medfwhm2 = median(fwhm_all[i2nz])
      medflux2 = median(flux_all[i2nz])
      rmsvel2 = sqrt(median((vel_all[i2nz]-medvel2)^2d))
+     rmsfwhm2 = sqrt(median((fwhm_all[i2nz]-medfwhm2)^2d))
+     rmsflux2 = sqrt(median((flux_all[i2nz]-medflux2)^2d))
      ibad2 = cmset_op(i2nz,'AND',where(abs(vel_all-medvel2) $
                                        gt sigrej*rmsvel2),count=nbad2)
      vel_all[ibad2] = medvel2
      fwhm_all[ibad2] = medfwhm2
      flux_all[ibad2] = medflux2
-
-     print,'Median velocity shift in slit 2: ',medvel2,format='(A0,I0)'
-     print,'RMS velocity deviation in slit 2: ',rmsvel2,format='(A0,D0.1)'
-     print,'No. pts. replaced in slit 2: ',nbad2,format='(A0,I0)'
+     printf,lunstats,'------'
+     printf,lunstats,'SLIT 2'
+     printf,lunstats,'------'
+     printf,lunstats,'VEL  median / RMS / med/RMS: ',$
+                     medvel2,rmsvel2,rmsvel2/medvel2,$
+                     format='(A-30,I10,D10.1,D10.3)'
+     printf,lunstats,'FWHM median / RMS / med/RMS: ',$
+                     medfwhm2,rmsfwhm2,rmsfwhm2/medfwhm2,$
+                     format='(A-30,I10,D10.1,D10.3)'
+     printf,lunstats,'FLUX median / RMS / med/RMS: ',$
+                     medflux2,rmsflux2,rmsflux2/medflux2,$
+                     format='(A-30,E10.2,E10.2,D10.3)'
   endif
 
-; Strip ".fits" from input data file
-  fitspos = strpos(datfile,'.fits')
-  if fitspos ne -1 then datfileuse=strmid(datfile,0,fitspos) $
-  else datfileuse=datfile
+; Sky vs. Sci stats
+  printf,lunstats,'-----------'
+  printf,lunstats,'SKY VS. SCI'
+  printf,lunstats,'-----------'
+  inzsci = cmset_op(nonzero,'AND',isci)
+  medvelsci = median(vel_all[inzsci])
+  medfwhmsci = median(fwhm_all[inzsci])
+  medfluxsci = median(flux_all[inzsci])
+  inzsky = cmset_op(nonzero,'AND',isky)
+  medvelsky = median(vel_all[inzsky])
+  medfwhmsky = median(fwhm_all[inzsky])
+  medfluxsky = median(flux_all[inzsky])
+  printf,lunstats,'VEL  sky / sci / frac diff: ',$
+                  medvelsky,medvelsci,$
+                  abs(medvelsky-medvelsci)/((medvelsky+medvelsci)/2d),$
+                  format='(A-30,D10.1,D10.1,D10.3)'
+  printf,lunstats,'FWHM  sky / sci / frac diff: ',$
+                  medfwhmsky,medfwhmsci,$
+                  abs(medfwhmsky-medfwhmsci)/((medfwhmsky+medfwhmsci)/2d),$
+                  format='(A-30,D10.1,D10.1,D10.3)'
+  printf,lunstats,'FLUX  sky / sci / frac diff: ',$
+                  medfluxsky,medfluxsci,$
+                  abs(medfluxsky-medfluxsci)/((medfluxsky+medfluxsci)/2d),$
+                  format='(A-30,E10.2,E10.2,D10.3)'
+
 
 ; Set ranges and plot
   zran = [min(fwhm_all[nonzero]),max(fwhm_all[nonzero])]
   gmos_maps_fiber,nslits,fwhm_all[goodap],x[goodap],y[goodap],$
-                  datfileuse+'_skyline_fwhm',zran=zran
+                  datfileuse+'_skyline_fwhm',zran=zran,dolab=dolab
   zran = [min(vel_all[nonzero]),max(vel_all[nonzero])]
   gmos_maps_fiber,nslits,vel_all[goodap],x[goodap],y[goodap],$
                   datfileuse+'_skyline_vel',cbform='(I0)',$
-                  zran=zran
+                  zran=zran,dolab=dolab
   zran = [min(flux_all[nonzero]),max(flux_all[nonzero])]
   gmos_maps_fiber,nslits,flux_all[goodap],x[goodap],y[goodap],$
                   datfileuse+'_skyline_flux',cbform='(E0.1)',$
-                  zran=zran
+                  zran=zran,dolab=dolab
 
 ; Correct line velocities
 
@@ -207,5 +272,7 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift
   writefits,outfile,cube.dat,header.dat,/append
   writefits,outfile,cube.var,header.var,/append
   writefits,outfile,cube.dq,header.dq,/append
+  
+  free_lun,lunstats
 
 end
