@@ -37,9 +37,10 @@
 ; :History:
 ;    ChangeHistory::
 ;      2014feb07, DSNR, created
+;      2016feb03, DSNR, added way to apply DQ to rebinning
 ;
 ; :Copyright:
-;    Copyright (C) 2014 David S. N. Rupke
+;    Copyright (C) 2014--2016 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -56,7 +57,7 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro ifsr_rebin,infile,outfile,factor,xlim,ylim
+pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq
 
   factor = double(factor)
 
@@ -70,13 +71,22 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim
   xlim--
   ylim--
 
+
 ; center in unity-offset coordinates
   dat_rb = rebin(cube.dat[xlim[0]:xlim[1],ylim[0]:ylim[1],*],$
                  nx,ny,cube.nz) * factor^2d
   var_rb = rebin(cube.var[xlim[0]:xlim[1],ylim[0]:ylim[1],*],$
                  nx,ny,cube.nz) * factor^2d
   dq_rb  = fix(rebin(double(cube.dq[xlim[0]:xlim[1],ylim[0]:ylim[1],*]),$
-                     nx,ny,cube.nz) * factor^2d)
+                     nx,ny,cube.nz)*factor^2d)
+
+  if keyword_set(applydq) then begin
+    fac_arr = dat_rb*0d + factor^2d/(factor^2d - double(dq_rb))
+    ibad = where(dq_rb eq 9)
+    fac_arr[ibad] = 0d
+    dat_rb *= fac_arr
+    var_rb *= fac_arr
+  endif
 
   bad = where(dq_rb gt 0,ct)
   dq_rb[bad] = 1

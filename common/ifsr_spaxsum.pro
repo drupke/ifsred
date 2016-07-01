@@ -59,7 +59,7 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist
+pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights
 
    cube = ifsf_readcube(infile,/quiet)
    dx = cube.ncols
@@ -91,6 +91,9 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist
          exit
       endelse
    endelse
+   
+   if ~ keyword_set(weights) then weights=dblarr(n_elements(isum))+1d
+   
    outdat=dblarr(cube.nz)
    outvar=dblarr(cube.nz)
    outdq=bytarr(cube.nz)
@@ -98,9 +101,9 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist
       outdattmp = cube.dat[*,*,i]
       outvartmp = cube.var[*,*,i]
       outdqtmp = cube.dq[*,*,i]
-      outdat[i] = total(outdattmp[isum])
-      outvar[i] = total(outvartmp[isum])
-      outdq[i] = total(outdqtmp[isum])
+      outdat[i] = total(outdattmp[isum]*weights)
+      outvar[i] = total(outvartmp[isum]*weights)
+      outdq[i] = total(outdqtmp[isum]*weights)
       if outdq[i] gt 0b then outdq[i] = 1b
    endfor      
 

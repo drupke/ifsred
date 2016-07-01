@@ -32,6 +32,9 @@
 ;      Do not apply velocity shifts.
 ;    plotlab: in, optional, type=byte
 ;      Add index labels to spaxels in plots
+;    skyaps: in, optional, type=dblarr(Naps)
+;      Option to choose sky apertures manually, if not all sky apertures are
+;      to used in subtraction.
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -51,9 +54,11 @@
 ;                       automated stitching of sky and data in plots 
 ;      2015jan05, DSNR, added option for spaxel labels in plots; revamped
 ;                       output stats
+;      2015aug12, DSNR, added option to specify sky apertures to use in subtraction
+;      2016jan28, DSNR, mods for data taken thru blue slit only
 ;
 ; :Copyright:
-;    Copyright (C) 2014-2015 David S. N. Rupke
+;    Copyright (C) 2014-2016 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -70,7 +75,8 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,plotlab=plotlab
+pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,$
+             plotlab=plotlab,skyaps=skyaps
 
   if keyword_set(plotlab) then dolab=1b else dolab=0b
 
@@ -92,7 +98,8 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,plotlab=plotl
   linelist = ifsf_linelist(skyline)
   
 ; Determine number of apertures and number of GMOS "slits" used (1 or 2)
-  naps = max(ap_mdf) 
+;  naps = max(ap_mdf)
+  naps = max(ap_mdf)-min(ap_mdf)+1
   if naps gt 750 then nslits=2 else nslits=1
   
 ; Populate arrays
@@ -106,10 +113,16 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,plotlab=plotl
 
 ; Subsets
 
-; Slit 1
-  i1 = where(ap_mdf le 750)
-; Slit 2
-  if nslits eq 2 then i2 = where(ap_mdf gt 750)
+; 1 slit
+  if nslits eq 1 then begin
+;   red slit
+    if min(ap_mdf) lt 750 then i1 = where(ap_mdf le 750) $
+;   blue slit
+    else i1 = where(ap_mdf gt 750)
+  endif else begin
+; 2 slits
+    i2 = where(ap_mdf gt 750)
+  endelse
 
 ; spaxels with non-zero sky line fluxes
   nonzero = where(flux_all ne 0)
@@ -128,6 +141,7 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,plotlab=plotl
     isky = ihi
     isci = ilo
   endelse
+  if keyword_set(skyaps) then isky = skyaps
   xjoinlo = max(x[ilo])
   xdiff = xjoinlo - max(x[where(x lt xmean AND x ne xjoinlo)])
   xjoinhi = min(x[ihi])

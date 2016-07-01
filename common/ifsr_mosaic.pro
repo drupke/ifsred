@@ -28,7 +28,8 @@
 ;      Directory where input files are located.
 ;    nocenter: in, optional, type=byte
 ;      Do not center the peak in the output data cube. Default is to
-;      center it.
+;      center it. Note that the this option presently may not result in the 
+;      full dimensions of the data being output, for reasons TBD.
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -44,9 +45,10 @@
 ;      2014feb06, DSNR, complete rewrite for ease of use/customization;
 ;                       added detailed documentation
 ;      2014aprXY, DSNR, fixed bug in call to SXPAR
+;      2015aug03, DSNR, note made about NOCENTER keyword; needs to be fixed
 ;
 ; :Copyright:
-;    Copyright (C) 2014 David S. N. Rupke
+;    Copyright (C) 2014-2015 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as

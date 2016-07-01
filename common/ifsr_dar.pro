@@ -72,9 +72,14 @@
 ;      2011may10, DSNR, improved rejection of outliers
 ;      2014feb04, DSNR, complete rewrite for ease of use/customization;
 ;                       added detailed documentation
+;      2016jan22, DSNR, fixed bug due to fact that wavelength-dependent shift
+;                       means that final cube will not have the same wavelength
+;                       range at all locations; cured by putting "missing" 
+;                       keyword in calls to interpolate
+;      2016jul01, DSNR, removed invocation of SYMBOLS routine
 ;                       
 ; :Copyright:
-;    Copyright (C) 2014 David S. N. Rupke
+;    Copyright (C) 2014--2016 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -233,9 +238,9 @@ pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
   multiplot,[2,1],gap=0.05
   cgplot,[0],xran=lran,yran=xranplot,/xsty,/ysty,$
        xtit=textoidl('Wavelength (A)'),ytit='X (spaxels)'
-  symbols,2,1.5
+;  symbols,2,1.5
 ; Good points
-  cgoplot,wcggx,xcgg,psym=8
+  cgoplot,wcggx,xcgg,psym=16,symsize=1.5
 ; Rejected points
   if ibx[0] ne -1 then cgoplot,wc[ibx],xc[ibx],psym=8,color='Green'
   if ib2x[0] ne -1 then cgoplot,wcgx[ib2x],xcg[ib2x],psym=8,color='Green'
@@ -271,9 +276,9 @@ pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
         xarr = dindgen(cube.ncols)+dx[0]
         yarr = dindgen(cube.nrows)+dy[0]
 
-        newflux = interpolate(flux,xarr,yarr,/grid)
-        newfluxvar = interpolate(fluxvar,xarr,yarr,/grid)
-        newfluxdq = interpolate(fluxdq,xarr,yarr,/grid)
+        newflux = interpolate(flux,xarr,yarr,/grid,missing=0)
+        newfluxvar = interpolate(fluxvar,xarr,yarr,/grid,missing=0)
+        newfluxdq = interpolate(fluxdq,xarr,yarr,/grid,missing=1)
         
         cube.dat[*,*,i] = newflux
         cube.var[*,*,i] = newfluxvar
