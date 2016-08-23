@@ -27,6 +27,8 @@
 ; :Keywords:
 ;    spaxlist: in, optional, type=dblarr(Nspax,2)
 ;      List of spaxels to combine. If this is chosen, SUMPAR parameter is ignored.
+;    fluxmult: in, optional, type=double
+;      Multiplier for flux in each spaxel.
 ;    
 ; :Author:
 ;    David S. N. Rupke::

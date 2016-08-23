@@ -77,7 +77,7 @@ pro ifsr_telcor,infile,outfile,tcfile,amcor=amcor,varnorm=varnorm,wvcor=wvcor
   header=1
   cube = ifsf_readcube(infile,header=header,/quiet)  
 
-  tcspec = readspec(tcfile)
+  tcspec = ifsr_readspec(tcfile)
   tcwave = tcspec[*,0]
   tcflux = tcspec[*,1]
 
