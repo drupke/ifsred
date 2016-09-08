@@ -1,0 +1,21 @@
+3100    1.37                                                      
+3200    0.82                                                      
+3400    0.51                                                      
+3600    0.37                                                      
+3800    0.30                                                      
+4000    0.25                                                      
+4500    0.17                                                      
+5000    0.13                                                      
+5500    0.12                                                      
+6000    0.11                                                      
+6500    0.11                                                      
+7000    0.10                                                      
+8000    0.07                                                      
+9000    0.05                                                      
+
+#This table is for use in IRAF procedures (e.g. spectroscopic reductions) 
+#that require an extinction table.  It applies to Mauna Kea.  
+#The numbers are taken from the Gemini web site.  There is a comparable
+#extinction curve in the CFHT observer's manual, but no numbers.  The left
+#column is in angstroms, the right column in magnitudes per unit air mass.
+#D. Rupke, 2/6/01                   

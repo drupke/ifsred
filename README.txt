@@ -23,7 +23,8 @@ Finally, IFSRED contains some GMOS- and NIFS-specific software:
 
 - Drop-in replacements for GFEXTRACT, GFTRANSFORM, GMOSAIC, and
   GSCALIBRATE in the v1.12 release of the Gemini IRAF package. These
-  permit the propagation of a variance plane.
+  permit the propagation of a variance plane. These capabilities are
+  incorporated in newer versions of the Gemini IRAF package.
 - A routine to create a map of the GMOS image plane prior to
   resampling from hexagonal to square pixels.
 - Routine to remove scattered light from NIFS data.
@@ -34,7 +35,7 @@ Finally, IFSRED contains some GMOS- and NIFS-specific software:
 REQUIREMENTS
 -------------------------------------------------------------------------
 
-IDL (tested on v8.3, but probably backwards compatible with some older
+IDL (tested on v8.3-v8.5, but probably backwards compatible with some older
 versions)
 
 IDL libraries:
@@ -78,7 +79,7 @@ Modifications are encouraged, but subject to the license.
 LICENSE AND COPYRIGHT
 -------------------------------------------------------------------------
 
-Copyright (C) 2014 David S. N. Rupke
+Copyright (C) 2014--2016 David S. N. Rupke
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
