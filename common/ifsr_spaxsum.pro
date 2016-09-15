@@ -15,6 +15,9 @@
 ; :Params:
 ;    infile: in, required, type=string
 ;      Path and filename of input file.
+;    nophu: in, optional, type=byte
+;      Added flag to indicate that the 0th extension contains the data, not
+;      the PHU.
 ;    outfile: in, required, type=string
 ;      Path and filename of output file.
 ;    sumpar: in, required, type=dblarr(3 or 4)
@@ -42,9 +45,10 @@
 ;    ChangeHistory::
 ;      2015jan17, DSNR, copied from GMOS_NUCSPEC_MRK231
 ;      2015may15, DSNR, added SPAXLIST option
+;      2016sep12, DSNR, added NOPHU option
 ;
 ; :Copyright:
-;    Copyright (C) 2015 David S. N. Rupke
+;    Copyright (C) 2015--2016 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -61,9 +65,21 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights
+pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
+                 nophu=nophu
 
-   cube = ifsf_readcube(infile,/quiet)
+   if keyword_set(nophu) then begin
+      datext=-1
+      varext=1
+      dqext=2
+      appenddat=0b
+   endif else begin
+      datext=1
+      varext=2
+      dqext=3
+      appenddat=1b
+   endelse
+   cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext)
    dx = cube.ncols
    dy = cube.nrows
 
@@ -111,7 +127,10 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights
 
    fxhmake,outhead,/extend,/date
 
-   fxhmake,outheaddat,outdat,/xtension,/date
+   if ~ keyword_set(nophu) then $
+      fxhmake,outheaddat,outdat,/xtension,/date $
+   else $
+      fxhmake,outheaddat,outdat,/extend,/date
    sxaddpar,outheaddat,'EXTNAME','SCI'
    sxaddpar,outheaddat,'DISPAXIS',1
    sxaddpar,outheaddat,'WCSDIM',1
@@ -141,8 +160,8 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights
    sxaddpar,outheaddq,'CD1_1',cube.cdelt
    sxaddpar,outheaddq,'CDELT1',cube.cdelt
 
-   writefits,outfile,[],outhead
-   writefits,outfile,outdat,outheaddat,/append
+   if ~ keyword_set(nophu) then writefits,outfile,[],outhead
+   writefits,outfile,outdat,outheaddat,append=appenddat
    writefits,outfile,outvar,outheadvar,/append
    writefits,outfile,outdq,outheaddq,/append
 

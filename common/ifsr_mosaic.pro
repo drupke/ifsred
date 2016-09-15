@@ -30,6 +30,11 @@
 ;      Do not center the peak in the output data cube. Default is to
 ;      center it. Note that the this option presently may not result in the 
 ;      full dimensions of the data being output, for reasons TBD.
+;    nophu: in, optional, type=byte
+;      Added flag to indicate that the 0th extension contains the data, not
+;      the PHU.
+;    osiris: in, optional, type=byte
+;      
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -46,9 +51,10 @@
 ;                       added detailed documentation
 ;      2014aprXY, DSNR, fixed bug in call to SXPAR
 ;      2015aug03, DSNR, note made about NOCENTER keyword; needs to be fixed
+;      2016sep12, DSNR, added NOPHU option
 ;
 ; :Copyright:
-;    Copyright (C) 2014-2015 David S. N. Rupke
+;    Copyright (C) 2014--2016 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -65,7 +71,7 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter
+pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
 
 ; Value for data outside the bounds of interpolation
   noval=-999d
@@ -85,17 +91,34 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter
   for i=0,nexp-1 do begin
 
      header=1
-     cube = ifsf_readcube(indir+infiles[i],header=header,/quiet)
+     if keyword_set(nophu) then begin
+        datext=-1
+        varext=1
+        dqext=2
+     endif else begin
+        datext=1
+        varext=2
+        dqext=3
+     endelse
+     cube = ifsf_readcube(indir+infiles[i],header=header,/quiet,$
+                          datext=datext,varext=varext,dqext=dqext)
 
 ;    Set output header to header of first cube
      if i eq 0 then outheader=header
 
-     writefits,outfile,cube.phu,outheader.phu
+     if ~ keyword_set(nophu) then begin
+        writefits,outfile,cube.phu,outheader.phu
+        pkheader = header.phu
+        appenddat=1
+     endif else begin
+        pkheader = header.dat
+        appenddat=0
+     endelse
      
 ;    Fitted galaxy center
-     xcc[i] = sxpar(header.phu,'XPEAK',/silent,count=ctx) - 1
-     ycc[i] = sxpar(header.phu,'YPEAK',/silent,count=cty) - 1
-     if ctx eq 0 OR cty eq 0 then begin
+     xcc[i] = sxpar(pkheader,'XPEAK',/silent,count=ctx) - 1
+     ycc[i] = sxpar(pkheader,'YPEAK',/silent,count=cty) - 1
+     if ~ keyword_set(nophu) AND (ctx eq 0 OR cty eq 0) then begin
 ;       Check science header if it's missing from PHU
         xcc[i] = sxpar(header.dat,'XPEAK','exposure'+string(i+1,format='(I0)'),$
                        /silent) - 1
@@ -226,7 +249,7 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter
      endfor
   endfor
 
-  writefits,outfile,datnew,outheader.dat,/append
+  writefits,outfile,datnew,outheader.dat,append=appenddat
 
   datnewall=0
   datnew=0  

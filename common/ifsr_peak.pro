@@ -30,12 +30,17 @@
 ;      than actual wavelengths. Indices are put in lamrange parameter.
 ;    outfile: in, optional, type=string
 ;      Optional output filename if re-writing header with new XPEAK, YPEAK.
+;    nophu: in, optional, type=byte
+;      Added flag to indicate that the 0th extension contains the data, not 
+;      the PHU.
 ;    quiet: in, optional, type=byte
 ;      Suppress output of centroids and half-widths to terminal.
 ;    xranfit: in, optional, type=dblarr(2)
-;      Range for fitting centroid, in cube columns. Default is full range.
+;      Range for fitting centroid, in cube columns, in single-offset indices. 
+;      Default is full range.
 ;    yranfit: in, optional, type=dblarr(2)
-;      Range for fitting centroid, in cube rows. Default is full range.
+;      Range for fitting centroid, in cube rows, in single-offset indices. 
+;      Default is full range.
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -52,9 +57,10 @@
 ;      2014feb06, DSNR, complete rewrite for ease of use/customization;
 ;                       added detailed documentation
 ;      2015may18, DSNR, added option to re-write header
+;      2016sep12, DSNR, added NOPHU option
 ;                       
 ; :Copyright:
-;    Copyright (C) 2014 David S. N. Rupke
+;    Copyright (C) 2014--2016 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -72,7 +78,8 @@
 ;
 ;-
 function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
-                   xranfit=xranfit,yranfit=yranfit,header=header,outfile=outfile
+                   xranfit=xranfit,yranfit=yranfit,header=header,$
+                   outfile=outfile,nophu=nophu
 
   if ~ keyword_set(circ) then circular=0 else circular=1
 
@@ -133,7 +140,7 @@ function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
   yc=param[5]+yranfituse[0]+1
 
   if not keyword_set(quiet) then begin
-     print,'Peak flux at [',xc,',',yc,'] is ',fc,$
+     print,'Peak flux at [',xc,',',yc,'] (single-offset indices) is ',fc,$
         format='(A0,D0.1,A0,D0.1,A0,E0.2)'
      print,'X/Y-widths: ',xhw,' / ',yhw,format='(A0,D0.2,A0,D0.2)'
   endif
@@ -143,16 +150,20 @@ function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
 ;
   if keyword_set(outfile) AND keyword_set(header) then begin
 
-
-;    Add peak locations to header. SXADDPAR increases the size of the header, 
-;    which confuses the structure, so we have to define a new array to hold the 
+;    Add peak locations to header. SXADDPAR increases the size of the header,
+;    which confuses the structure, so we have to define a new array to hold the
 ;    new header.
-     newheader_phu = header.phu
-     sxaddpar,newheader_phu,'XPEAK',xc,'Column of peak flux (pixels)'
-     sxaddpar,newheader_phu,'YPEAK',yc,'Row of peak flux (pixels)'
+     if ~ keyword_set(nophu) then newheader = header.phu $
+     else newheader = header.dat
+     sxaddpar,newheader,'XPEAK',xc,'Column of peak flux (pixels)'
+     sxaddpar,newheader,'YPEAK',yc,'Row of peak flux (pixels)'
 
-     writefits,outfile,cube.phu,newheader_phu
-     writefits,outfile,cube.dat,header.dat,/append
+     if ~ keyword_set(nophu) then begin
+        writefits,outfile,cube.phu,newheader
+        writefits,outfile,cube.dat,header.dat,/append
+     endif else begin
+        writefits,outfile,cube.dat,newheader
+     endelse
      writefits,outfile,cube.var,header.var,/append
      writefits,outfile,cube.dq,header.dq,/append
 

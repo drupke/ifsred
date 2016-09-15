@@ -24,6 +24,9 @@
 ;      or decrease correction. Higher amcor means airmass in data is
 ;      higher than in the reference data. This is equal to the
 ;      airmass ratio of the data and reference data.
+;    nophu: in, optional, type=byte
+;      Added flag to indicate that the 0th extension contains the data, not
+;      the PHU.
 ;    varnorm: in, optional, type=double, default=1
 ;      Multiplier to the output variance to bias subsequent fits away
 ;      from telluric regions. The multiplier is applied to regions
@@ -53,9 +56,10 @@
 ;      2015jan23, DSNR, changed default varnorm to 1 (was 4)
 ;      2015may20, DSNR, re-wrote logic for dealing with cubes -- no longer
 ;                       assume 3-d data.
+;      2016sep12, DSNR, added NOPHU option
 ;
 ; :Copyright:
-;    Copyright (C) 2014-2015 David S. N. Rupke
+;    Copyright (C) 2014--2016 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -72,10 +76,23 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro ifsr_telcor,infile,outfile,tcfile,amcor=amcor,varnorm=varnorm,wvcor=wvcor
+pro ifsr_telcor,infile,outfile,tcfile,amcor=amcor,varnorm=varnorm,wvcor=wvcor,$
+                nophu=nophu
 
   header=1
-  cube = ifsf_readcube(infile,header=header,/quiet)  
+  if keyword_set(nophu) then begin
+     datext=-1
+     varext=1
+     dqext=2
+     appenddat=0b
+  endif else begin
+     datext=1
+     varext=2
+     dqext=3
+     appenddat=1b
+  endelse
+  cube = ifsf_readcube(infile,header=header,/quiet,datext=datext,varext=varext,$
+                       dqext=dqext)  
 
   tcspec = ifsr_readspec(tcfile)
   tcwave = tcspec[*,0]
@@ -148,8 +165,8 @@ pro ifsr_telcor,infile,outfile,tcfile,amcor=amcor,varnorm=varnorm,wvcor=wvcor
 
 ; Write output
 
-  writefits,outfile,cube.phu,header.phu
-  writefits,outfile,cube.dat,header.dat,/append
+  if ~ keyword_set(nophu) then writefits,outfile,cube.phu,header.phu
+  writefits,outfile,cube.dat,header.dat,append=appenddat
   writefits,outfile,cube.var,header.var,/append
   writefits,outfile,cube.dq,header.dq,/append
 
