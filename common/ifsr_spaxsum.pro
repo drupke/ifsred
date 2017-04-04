@@ -2,9 +2,7 @@
 ;
 ;+
 ;
-; Sum spaxels in a data cube over a square or circular aperture. Center must be 
-; in integer coordinates, and for a square aperture the full widths must be
-; even numbers.
+; Sum spaxels in a data cube over a square or circular aperture.
 ;
 ; :Categories:
 ;    IFSRED
@@ -21,11 +19,9 @@
 ;    outfile: in, required, type=string
 ;      Path and filename of output file.
 ;    sumpar: in, required, type=dblarr(3 or 4)
-;      Parameters for summation. First two elements are center for summation, 
-;      in unity-offset x and y spaxel coordinates. If circular aperture,
-;      third element is radius in spaxels and there is no fourth element. If
-;      square aperture, then third and fourth elements are aperture full widths
-;      in spaxels in x and y directions. Ignored if keyword SPAXLIST set.
+;      Parameters for summation, in unity-offset coordinates. Circular 
+;      aperture: [x0, y0, r]. Rectangular aperture: [x1,y1,x2,y2]. Ignored if 
+;      keyword SPAXLIST set.
 ;      
 ; :Keywords:
 ;    spaxlist: in, optional, type=dblarr(Nspax,2)
@@ -66,7 +62,7 @@
 ;
 ;-
 pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
-                 nophu=nophu
+                 nophu=nophu,ignorepar=ignorepar
 
    if keyword_set(nophu) then begin
       datext=-1
@@ -95,20 +91,36 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    endif else begin
       if n_elements(sumpar) eq 3 then begin
 ;        Circular aperture
-         map_r = sqrt((map_x - sumpar[0])^2d + (map_y - sumpar[1])^2d)
-         isum = where(map_r le sumpar[2])
+         map_r = sqrt((map_x - double(sumpar[0]))^2d + $
+                      (map_y - double(sumpar[1]))^2d)
+         isum = where(map_r le double(sumpar[2]))
       endif else if n_elements(sumpar) eq 4 then begin
 ;        Square aperture
-         isumx = where(map_x ge sumpar[0]-sumpar[2]/2 AND $
-                       map_x le sumpar[0]+sumpar[2]/2)
-         isumy = where(map_y ge sumpar[0]-sumpar[3]/2 AND $
-                       map_y le sumpar[0]+sumpar[3]/2)
+         isumx = where(map_x ge double(sumpar[0]) AND $
+                       map_x le double(sumpar[2]))
+         isumy = where(map_y ge double(sumpar[1]) AND $
+                       map_y le double(sumpar[3]))
          isum = cgsetintersection(isumx,isumy)
-      end else begin
-         print,'IFSR_SPAXSUM: Number of elements in SUMPAR must be 3 or 4.'
-         exit
-      endelse
+      end else message,'Number of elements in SUMPAR must be 3 or 4.'
    endelse
+
+;  circular or square region to ignore
+   if keyword_set(ignorepar) then begin
+      if n_elements(ignorepar) eq 3 then begin
+;        Circular aperture
+         map_r = sqrt((map_x - double(ignorepar[0]))^2d + $
+                      (map_y - double(ignorepar[1]))^2d)
+         iignore = where(map_r le double(ignorepar[2]))
+      endif else if n_elements(ignorepar) eq 4 then begin
+;        Square aperture
+         iignorex = where(map_x ge double(ignorepar[0]) AND $
+                          map_x le double(ignorepar[2]))
+         iignorey = where(map_y ge double(ignorepar[1]) AND $
+                          map_y le double(ignorepar[3]))
+         iignore = cgsetintersection(iignorex,iignorey)
+      end else message,'Number of elements in IGNOREPAR must be 3 or 4.'
+      isum = cgsetdifference(isum,iignore)
+   endif
    
    if ~ keyword_set(weights) then weights=dblarr(n_elements(isum))+1d
    

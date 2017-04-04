@@ -89,11 +89,17 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
 ;  If total flux per unit area is being conserved, then rebinning a 2x2 array 
 ;  with 1s to a 1x1 array should return 1. Thus, when flux per unit area is
 ;  multiplied by area, then the correct total flux is returned in either case.
-   if keyword_set(fluxperarea) then fluxfact=1d else fluxfact = factor^2d
+   if keyword_set(fluxperarea) then begin
+      fluxfact_dat=1d
+      fluxfact_var=1d/factor^2d
+   endif else begin
+      fluxfact_dat=factor^2d
+      fluxfact_var=factor^2d
+   endelse
    dat_rb = rebin(cube.dat[xlim[0]:xlim[1],ylim[0]:ylim[1],*],$
-                  nx,ny,cube.nz) * fluxfact
+                  nx,ny,cube.nz) * fluxfact_dat
    var_rb = rebin(cube.var[xlim[0]:xlim[1],ylim[0]:ylim[1],*],$
-                  nx,ny,cube.nz) * fluxfact
+                  nx,ny,cube.nz) * fluxfact_var
 ;  DQ is treated differently b/c not propagating flux, but a flag
    dq_rb  = fix(rebin(double(cube.dq[xlim[0]:xlim[1],ylim[0]:ylim[1],*]),$
                       nx,ny,cube.nz) * factor^2d)

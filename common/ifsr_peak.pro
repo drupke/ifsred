@@ -79,7 +79,8 @@
 ;-
 function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
                    xranfit=xranfit,yranfit=yranfit,header=header,$
-                   outfile=outfile,nophu=nophu
+                   outfile=outfile,nophu=nophu,moffat=moffat ;,$
+;                   fixbaseline=fixbaseline
 
   if ~ keyword_set(circ) then circular=0 else circular=1
 
@@ -130,7 +131,19 @@ function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
     varsum[inoflux]=1d99
   endif
   
-  yfit = mpfit2dpeak(datsum,param,weights=1d/varsum,circular=circular)
+  if keyword_set(moffat) then begin
+     moffat=1b
+;     npar=8
+  endif else begin
+     moffat=0b
+;     npar=7
+  endelse
+;  parinfo = REPLICATE({fixed:0b, value:0d},npar)
+;  if keyword_set(fixbaseline) then $
+;     parinfo[0].fixed = 1b else parinfo[0].fixed=0b
+
+  yfit = mpfit2dpeak(datsum,param,weights=1d/varsum,$
+                     circular=circular,moffat=moffat) ;,parinfo=parinfo)
 ; Output parameters are central flux, half widths, and centroids. +1 converts 
 ; from 0-offset indices to cols and rows that start at 1.
   fc=param[1]
@@ -138,11 +151,12 @@ function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
   yhw=param[3]
   xc=param[4]+xranfituse[0]+1
   yc=param[5]+yranfituse[0]+1
+  if keyword_set(moffat) then gamma = param[7]
 
   if not keyword_set(quiet) then begin
      print,'Peak flux at [',xc,',',yc,'] (single-offset indices) is ',fc,$
         format='(A0,D0.1,A0,D0.1,A0,E0.2)'
-     print,'X/Y-widths: ',xhw,' / ',yhw,format='(A0,D0.2,A0,D0.2)'
+     print,'X/Y half-widths: ',xhw,' / ',yhw,format='(A0,D0.2,A0,D0.2)'
   endif
 
 ;

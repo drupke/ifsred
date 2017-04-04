@@ -35,6 +35,8 @@
 ;    skyaps: in, optional, type=dblarr(Naps)
 ;      Option to choose sky apertures manually, if not all sky apertures are
 ;      to used in subtraction.
+;    dqval: in, optional, type=double, default=1
+;      Value for output DQ. NOTE: GFCUBE assumes 8!
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -56,6 +58,7 @@
 ;                       output stats
 ;      2015aug12, DSNR, added option to specify sky apertures to use in subtraction
 ;      2016jan28, DSNR, mods for data taken thru blue slit only
+;      2017jan10, DSNR, DQVAL par
 ;
 ; :Copyright:
 ;    Copyright (C) 2014-2016 David S. N. Rupke
@@ -76,9 +79,10 @@
 ;
 ;-
 pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,$
-             plotlab=plotlab,skyaps=skyaps
+             plotlab=plotlab,skyaps=skyaps,dqval=dqval
 
   if keyword_set(plotlab) then dolab=1b else dolab=0b
+  if ~ keyword_set(dqval) then dqval=1d
 
   fwhmtosig = 2d*sqrt(2d*alog(2d))
 
@@ -107,9 +111,9 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,$
   flux_all = dblarr(naps)
   vel_all = dblarr(naps)
   fwhm_all = dblarr(naps)
-  flux_all[goodap] = linmaps[skyline,*,0,0,0]
-  vel_all[goodap] = (linmaps[skyline,*,0,0,2]/linelist[skyline]-1d)*299792d
-  fwhm_all[goodap] = linmaps[skyline,*,0,0,3]*fwhmtosig
+  flux_all[goodap] = emlflx['fc1',skyline,*,0]
+  vel_all[goodap] = (emlwav['c1',skyline,*,0]/linelist[skyline]-1d)*299792d
+  fwhm_all[goodap] = emlsig['c1',skyline,*,0]*fwhmtosig
 
 ; Subsets
 
@@ -256,7 +260,7 @@ pro gmos_sky,datfile,fitfile,skyline,sigrej=sigrej,noshift=noshift,$
            zeroind = where(newdq le 0.01,ctzeroind)
            oneind = where(newdq gt 0.01,ctoneind)
            newdq[zeroind] = 0
-           newdq[oneind] = 1
+           newdq[oneind] = dqval
            cube.dat[*,i] = newdat
            cube.var[*,i] = newvar
            cube.dq[*,i] = newdq

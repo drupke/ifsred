@@ -21,9 +21,9 @@
 ;      Path and filename for input data cube. Cube should contain data, 
 ;      variance, and DQ planes in extensions 1-3.
 ;    xord: in, required, type=integer
-;      Order of polynomial fit to centroid columns vs. wavelength.
+;      Degree of polynomial fit to centroid columns vs. wavelength.
 ;    yord: in, required, type=integer
-;      Order of polynomial fit to centroid rows vs. wavelength.
+;      Degree of polynomial fit to centroid rows vs. wavelength.
 ;
 ; :Keywords:
 ;    circ: in, optional, type=byte
@@ -182,7 +182,7 @@ pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
   ibx = where(flag)
   wcgx=wc[igx]
   xcg=xc[igx]
-  xcoeff=mpfitfun('poly',wcgx,xcg,0,dblarr(xord),$
+  xcoeff=mpfitfun('poly',wcgx,xcg,0,dblarr(xord+1),$
                   weights=dblarr(ngx)+1d,yfit=xcfit,/quiet)
   if xord eq 0 then xcfit=dblarr(ngx)+xcfit
 
@@ -193,7 +193,7 @@ pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
   ib2x=where(xcg_dev gt sigcut*xcg_rms)
   wcggx = wcgx[ig2x]
   xcgg = xcg[ig2x]
-  xcoeff=mpfitfun('poly',wcggx,xcgg,0,dblarr(xord),$
+  xcoeff=mpfitfun('poly',wcggx,xcgg,0,dblarr(xord+1),$
                   weights=dblarr(nggx)+1d,yfit=xcfit,/quiet)
   if xord eq 0 then xcfit=dblarr(nggx)+xcfit
 
@@ -203,7 +203,7 @@ pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
   iby = where(flag)
   wcgy=wc[igy]
   ycg=yc[igy]
-  ycoeff=mpfitfun('poly',wcgy,ycg,0,dblarr(yord),$
+  ycoeff=mpfitfun('poly',wcgy,ycg,0,dblarr(yord+1),$
                   weights=dblarr(ngy)+1d,yfit=ycfit,/quiet)
   if yord eq 0 then ycfit=dblarr(ngy)+ycfit
   ycg_rms=sqrt(median((ycg-ycfit)^2d))
@@ -212,7 +212,7 @@ pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
   ib2y=where(ycg_dev gt sigcut*ycg_rms)
   wcggy = wcgy[ig2y]
   ycgg = ycg[ig2y]
-  ycoeff=mpfitfun('poly',wcggy,ycgg,0,dblarr(yord),$
+  ycoeff=mpfitfun('poly',wcggy,ycgg,0,dblarr(yord+1),$
                   weights=dblarr(nggy)+1d,yfit=ycfit,/quiet)
   if yord eq 0 then ycfit=dblarr(nggy)+ycfit
 
@@ -233,25 +233,24 @@ pro ifsr_dar,incube,xord,yord,circ=circ,dlam=dlam,$
   else incubeuse=incube
   
   cgps_open,incubeuse+'_dar.eps',charsize=1,default_thick=2,/encap,$
-     /inches,xs=10,ys=5,/qui
+            /inches,xs=10,ys=5,/qui
 
   multiplot,[2,1],gap=0.05
   cgplot,[0],xran=lran,yran=xranplot,/xsty,/ysty,$
-       xtit=textoidl('Wavelength (A)'),ytit='X (spaxels)'
-;  symbols,2,1.5
+         xtit='Wavelength',ytit='X (spaxels)'
 ; Good points
-  cgoplot,wcggx,xcgg,psym=16,symsize=1.5
+  cgoplot,wcggx,xcgg,psym=16,symsize=1d
 ; Rejected points
-  if ibx[0] ne -1 then cgoplot,wc[ibx],xc[ibx],psym=8,color='Green'
-  if ib2x[0] ne -1 then cgoplot,wcgx[ib2x],xcg[ib2x],psym=8,color='Green'
+  if ibx[0] ne -1 then cgoplot,wc[ibx],xc[ibx],psym=9,color='Green',symsize=0.75d
+  if ib2x[0] ne -1 then cgoplot,wcgx[ib2x],xcg[ib2x],psym=9,color='Green',symsize=0.75d
 ; Fit
   cgoplot,wcggx,xcfit,color='Red',thick=4
   multiplot,/doyaxis
   cgplot,[0],xran=lran,yran=yranplot,/xsty,/ysty,$
-       xtit=textoidl('Wavelength (A)'),ytit='Y (spaxels)'
-  cgoplot,wcggy,ycgg,psym=8
-  if iby[0] ne -1 then cgoplot,wc[iby],yc[iby],psym=8,color='Green'
-  if ib2y[0] ne -1 then cgoplot,wcgy[ib2y],ycg[ib2y],psym=8,color='Green'
+         xtit='Wavelength',ytit='Y (spaxels)'
+  cgoplot,wcggy,ycgg,psym=16,symsize=1
+  if iby[0] ne -1 then cgoplot,wc[iby],yc[iby],psym=9,color='Green',symsize=0.75d
+  if ib2y[0] ne -1 then cgoplot,wcgy[ib2y],ycg[ib2y],psym=9,color='Green',symsize=0.75d
   cgoplot,wcggy,ycfit,color='Red',thick=4
 
   multiplot,/reset
