@@ -24,10 +24,15 @@
 ;      keyword SPAXLIST set.
 ;      
 ; :Keywords:
-;    spaxlist: in, optional, type=dblarr(Nspax,2)
-;      List of spaxels to combine. If this is chosen, SUMPAR parameter is ignored.
 ;    fluxmult: in, optional, type=double
 ;      Multiplier for flux in each spaxel.
+;    invvar: in, optional, type=byte
+;      Set if the data cube holds inverse variance instead of variance. The
+;      output structure will still contain the variance.
+;    spaxlist: in, optional, type=dblarr(Nspax,2)
+;      List of spaxels to combine. If this is chosen, SUMPAR parameter is ignored.
+;    waveext: in, optional, type=integer
+;      The extention number of a wavelength array.
 ;    
 ; :Author:
 ;    David S. N. Rupke::
@@ -42,9 +47,10 @@
 ;      2015jan17, DSNR, copied from GMOS_NUCSPEC_MRK231
 ;      2015may15, DSNR, added SPAXLIST option
 ;      2016sep12, DSNR, added NOPHU option
+;      2018feb08, DSNR, added WAVEEXT and INVVAR keywords
 ;
 ; :Copyright:
-;    Copyright (C) 2015--2016 David S. N. Rupke
+;    Copyright (C) 2015--2018 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -62,20 +68,32 @@
 ;
 ;-
 pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
-                 nophu=nophu,ignorepar=ignorepar
+                 nophu=nophu,ignorepar=ignorepar,reversevardq=reversevardq,$
+                 waveext=waveext,invvar=invvar
 
    if keyword_set(nophu) then begin
       datext=-1
       varext=1
       dqext=2
+      if keyword_set(reversevardq) then begin
+         varext=2
+         dqext=1
+      endif
       appenddat=0b
    endif else begin
       datext=1
       varext=2
       dqext=3
+      if keyword_set(reversevardq) then begin
+         varext=3
+         dqext=2
+      endif
       appenddat=1b
    endelse
-   cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext)
+   if ~ keyword_set(waveext) then waveext=0
+   if ~ keyword_set(invvar) then invvar=0
+   cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext,$
+                        waveext=waveext,invvar=invvar)
    dx = cube.ncols
    dy = cube.nrows
 
@@ -174,7 +192,14 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
 
    if ~ keyword_set(nophu) then writefits,outfile,[],outhead
    writefits,outfile,outdat,outheaddat,append=appenddat
-   writefits,outfile,outvar,outheadvar,/append
-   writefits,outfile,outdq,outheaddq,/append
+   if keyword_set(reversevardq) then begin
+      writefits,outfile,outdq,outheaddq,/append
+      writefits,outfile,outvar,outheadvar,/append
+   endif else begin
+      writefits,outfile,outvar,outheadvar,/append
+      writefits,outfile,outdq,outheaddq,/append
+   endelse
+   if keyword_set(waveext) then $
+      writefits,outfile,cube.wave,header_wave,/append
 
 end
