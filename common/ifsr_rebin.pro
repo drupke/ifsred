@@ -47,6 +47,9 @@
 ;      2016feb03, DSNR, added way to apply DQ to output data and variance
 ;      2016jul13, DSNR, added option for conserving flux/area; previously
 ;                       routine conserved total flux, not flux/area
+;      2018may08, DSNR, code now corrects for non-complete coverage within
+;                       a bin by correcting upward if spaxels or parts of 
+;                       spaxels are missing (assumed to have 0 flux)
 ;
 ; :Copyright:
 ;    Copyright (C) 2014--2016 David S. N. Rupke
@@ -67,12 +70,17 @@
 ;
 ;-
 pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
-               fluxperarea=fluxperarea
+               fluxperarea=fluxperarea,datext=datext,varext=varext,dqext=dqext
 
    factor = double(factor)
 
+   if ~ keyword_set(datext) then datext=1
+   if ~ keyword_set(varext) then varext=2
+   if ~ keyword_set(dqext) then dqext=3
+
    header=1
-   cube = ifsf_readcube(infile,header=header)
+   cube = ifsf_readcube(infile,header=header,datext=datext,varext=varext,$
+                        dqext=dqext)
 
    nx = fix((xlim[1]-xlim[0]+1) / factor)
    ny = fix((ylim[1]-ylim[0]+1) / factor)
@@ -100,6 +108,16 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
                   nx,ny,cube.nz) * fluxfact_dat
    var_rb = rebin(cube.var[xlim[0]:xlim[1],ylim[0]:ylim[1],*],$
                   nx,ny,cube.nz) * fluxfact_var
+;  Correct for binned spaxels where certain wavelengths may be missing in some 
+;  spaxels (assumed to be zeroed) or whole spaxels are missing
+   numgood = dblarr(cube.ncols,cube.nrows,cube.nz)
+   inonzero = where(cube.dat ne 0)
+   numgood[inonzero] = 1d
+   numgood_rb = rebin(numgood[xlim[0]:xlim[1],ylim[0]:ylim[1],*],$
+                      nx,ny,cube.nz)
+   inonzero_rb = where(dat_rb ne 0)
+   dat_rb[inonzero_rb] /= numgood_rb[inonzero_rb]
+   var_rb[inonzero_rb] /= numgood_rb[inonzero_rb]
 ;  DQ is treated differently b/c not propagating flux, but a flag
    dq_rb  = fix(rebin(double(cube.dq[xlim[0]:xlim[1],ylim[0]:ylim[1],*]),$
                       nx,ny,cube.nz) * factor^2d)
@@ -117,18 +135,20 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
    dq_rb[bad] = 1
 ;  dq_rb -= 32768
 
-   newheader_phu = header.phu
+   if datext ne 0 then begin
+      newheader_phu = header.phu
+      cd11 = sxpar(newheader_phu,'CD1_1',/silent)
+      cd12 = sxpar(newheader_phu,'CD1_2',/silent)
+      cd21 = sxpar(newheader_phu,'CD2_1',/silent)
+      cd22 = sxpar(newheader_phu,'CD2_2',/silent)
+      sxaddpar,newheader_phu,'CD1_1',factor*cd11
+      sxaddpar,newheader_phu,'CD1_2',factor*cd12
+      sxaddpar,newheader_phu,'CD2_1',factor*cd21
+      sxaddpar,newheader_phu,'CD2_2',factor*cd22
+   endif
    newheader_dat = header.dat
    newheader_var = header.var
    newheader_dq = header.dq
-   cd11 = sxpar(newheader_phu,'CD1_1',/silent)
-   cd12 = sxpar(newheader_phu,'CD1_2',/silent)
-   cd21 = sxpar(newheader_phu,'CD2_1',/silent)
-   cd22 = sxpar(newheader_phu,'CD2_2',/silent)
-   sxaddpar,newheader_phu,'CD1_1',factor*cd11
-   sxaddpar,newheader_phu,'CD1_2',factor*cd12
-   sxaddpar,newheader_phu,'CD2_1',factor*cd21
-   sxaddpar,newheader_phu,'CD2_2',factor*cd22
    sxaddpar,newheader_dat,'CD1_1',-factor/10d
    sxaddpar,newheader_dat,'CD2_2',-factor/10d
    sxaddpar,newheader_dat,'CDELT1',-factor/10d
@@ -144,8 +164,12 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
  
 ;  Write output
 
-   writefits,outfile,cube.phu,newheader_phu
-   writefits,outfile,dat_rb,newheader_dat,/append
+   if datext ne 0 then begin
+      writefits,outfile,cube.phu,newheader_phu
+      writefits,outfile,dat_rb,newheader_dat,/append
+   endif else begin
+      writefits,outfile,dat_rb,newheader_dat
+   endelse
    writefits,outfile,var_rb,newheader_var,/append
    writefits,outfile,dq_rb,newheader_dq,/append
 
