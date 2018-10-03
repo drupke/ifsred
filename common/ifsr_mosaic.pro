@@ -52,6 +52,8 @@
 ;      2014aprXY, DSNR, fixed bug in call to SXPAR
 ;      2015aug03, DSNR, note made about NOCENTER keyword; needs to be fixed
 ;      2016sep12, DSNR, added NOPHU option
+;      2018sep28, DSNR, small bug fixes for doing large mosaics where
+;                       source not centered
 ;
 ; :Copyright:
 ;    Copyright (C) 2014--2016 David S. N. Rupke
