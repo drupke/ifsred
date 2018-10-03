@@ -134,6 +134,8 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
      if i eq 0 then begin
         nz0 = cube.nz
         crpix0 = cube.crpix
+        crval0 = cube.crval
+        cdelt0 = cube.cdelt
         datall = dblarr(cube.ncols,cube.nrows,cube.nz,nexp)
         varall = dblarr(cube.ncols,cube.nrows,cube.nz,nexp)
         dqall = dblarr(cube.ncols,cube.nrows,cube.nz,nexp)
@@ -146,30 +148,25 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
      endif
 
 ;    Put everything on a common wavelength solution, if it is not already.
+;    This bit assumes that the differences between wavelength solutions are found
+;    in the initial pixel CRPIX. This may not always apply.
+     if cube.cdelt ne cdelt0 then print,'WARNING: Exposures have different '+$
+        'dispersions. IFSR_MOSAIC does not account for this.'
      dcrpix = cube.crpix - crpix0
-     if cube.nz le nz0 then begin
-        if dcrpix le 0 then begin
-           datall[*,*,abs(dcrpix):cube.nz-1,i] = $
-              cube.dat[*,*,0:cube.nz-1-abs(dcrpix)]
-           varall[*,*,abs(dcrpix):cube.nz-1,i] = $
-              cube.var[*,*,0:cube.nz-1-abs(dcrpix)]
-           dqall[*,*,abs(dcrpix):cube.nz-1,i] = $
-              cube.dq[*,*,0:cube.nz-1-abs(dcrpix)]
-        endif else begin
-           datall[*,*,0:cube.nz-1-dcrpix,i] = cube.dat[*,*,dcrpix:cube.nz-1]
-           varall[*,*,0:cube.nz-1-dcrpix,i] = cube.var[*,*,dcrpix:cube.nz-1]
-           dqall[*,*,0:cube.nz-1-dcrpix,i] = cube.dq[*,*,dcrpix:cube.nz-1]
-        endelse
+     dcrval = round((cube.crval - crval0)/cdelt0)
+     ddcrval_fracdiff = abs(((cube.crval - crval0)/cdelt0 - dcrval)/dcrval)
+     if ddcrval_fracdiff ge 0.05d  then print,'WARNING: Exposure '+$
+        string(i,format='(I0)')+' does not line up in lambda space with ref. exp.' 
+     dpix = dcrpix - dcrval
+     nzuse = (cube.nz le nz0) ? cube.nz : nz0
+     if dpix le 0 then begin
+        datall[*,*,abs(dpix):nzuse-1,i] = cube.dat[*,*,0:nzuse-1-abs(dpix)]
+        varall[*,*,abs(dpix):nzuse-1,i] = cube.var[*,*,0:nzuse-1-abs(dpix)]
+        dqall[*,*,abs(dpix):nzuse-1,i]  = cube.dq[*,*,0:nzuse-1-abs(dpix)]
      endif else begin
-        if dcrpix le 0 then begin
-           datall[*,*,abs(dcrpix):nz0-1,i] = cube.dat[*,*,0:nz0-1-abs(dcrpix)]
-           varall[*,*,abs(dcrpix):nz0-1,i] = cube.var[*,*,0:nz0-1-abs(dcrpix)]
-           dqall[*,*,abs(dcrpix):nz0-1,i] = cube.dq[*,*,0:nz0-1-abs(dcrpix)]
-        endif else begin
-           datall[*,*,0:nz0-1-dcrpix,i] = cube.dat[*,*,dcrpix:nz0-1]
-           varall[*,*,0:nz0-1-dcrpix,i] = cube.var[*,*,dcrpix:nz0-1]
-           dqall[*,*,0:nz0-1-dcrpix,i] = cube.dq[*,*,dcrpix:nz0-1]
-        endelse
+        datall[*,*,0:nzuse-1-dpix,i] = cube.dat[*,*,dpix:nzuse-1]
+        varall[*,*,0:nzuse-1-dpix,i] = cube.var[*,*,dpix:nzuse-1]
+        dqall[*,*,0:nzuse-1-dpix,i] = cube.dq[*,*,dpix:nzuse-1]
      endelse
 
 ;    Add in integer residual w.r.t. center
@@ -197,8 +194,10 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
      rowoff = round(double(newrows/2d))-1
 ; ... or not.
   endif else begin
-     coloff = fix(mean(xcc))+2
-     rowoff = fix(mean(ycc))+2
+;     coloff = fix(mean(xcc))+2
+;     rowoff = fix(mean(ycc))+2
+     coloff = -min(xnewarr)+2
+     rowoff = -min(ynewarr)+2
   endelse
   xnewarr += coloff
   ynewarr += rowoff
@@ -211,12 +210,12 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
   print,'IFSR_MOSAIC: Interpolating data to full grid and combining.'
 
 ; Initialize arrays for new cube.
-  datnewall = dblarr(newcols,newrows,cube.nz,nexp)-noval
-  dqnewall = bytarr(newcols,newrows,cube.nz,nexp)+1b
-  datnew = dblarr(newcols,newrows,cube.nz)
-  dqnew = intarr(newcols,newrows,cube.nz)
+  datnewall = dblarr(newcols,newrows,nz0,nexp)-noval
+  dqnewall = bytarr(newcols,newrows,nz0,nexp)+1b
+  datnew = dblarr(newcols,newrows,nz0)
+  dqnew = intarr(newcols,newrows,nz0)
 
-  for i=0,cube.nz-1 do begin
+  for i=0,nz0-1 do begin
      for j=0,nexp-1 do begin
         datnewall[xnewarr[*,j],ynewarr[*,j],i,j] = $
            interpolate(datall[*,*,i,j],$
@@ -235,7 +234,7 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
   
   for i=0,newcols-1 do begin
      for j=0,newrows-1 do begin
-        for k=0,cube.nz-1 do begin
+        for k=0,nz0-1 do begin
            good = where(datnewall[i,j,k,*] ne noval AND $
                         dqnewall[i,j,k,*] eq 0,ctg)
            if ctg gt 0 then begin
@@ -258,10 +257,10 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
 
   print,'IFSR_MOSAIC: Interpolating variance to full grid and combining.'
 
-  varnewall = dblarr(newcols,newrows,cube.nz,nexp)+noval
-  varnew = dblarr(newcols,newrows,cube.nz)
+  varnewall = dblarr(newcols,newrows,nz0,nexp)+noval
+  varnew = dblarr(newcols,newrows,nz0)
 
-  for i=0,cube.nz-1 do begin
+  for i=0,nz0-1 do begin
      for j=0,nexp-1 do begin
         varnewall[xnewarr[*,j],ynewarr[*,j],i,j] = $
            interpolate(varall[*,*,i,j],$
@@ -271,7 +270,7 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
   endfor
   for i=0,newcols-1 do begin
      for j=0,newrows-1 do begin
-        for k=0,cube.nz-1 do begin
+        for k=0,nz0-1 do begin
            good = where(varnewall[i,j,k,*] ne noval AND $
                         dqnewall[i,j,k,*] eq 0,ctg)
            if ctg gt 0 then begin

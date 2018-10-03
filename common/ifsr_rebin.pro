@@ -77,7 +77,7 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
    if ~ keyword_set(datext) then datext=1
    if ~ keyword_set(varext) then varext=2
    if ~ keyword_set(dqext) then dqext=3
-
+   
    header=1
    cube = ifsf_readcube(infile,header=header,datext=datext,varext=varext,$
                         dqext=dqext)
@@ -135,7 +135,7 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
    dq_rb[bad] = 1
 ;  dq_rb -= 32768
 
-   if datext ne 0 then begin
+   if datext gt 0 then begin
       newheader_phu = header.phu
       cd11 = sxpar(newheader_phu,'CD1_1',/silent)
       cd12 = sxpar(newheader_phu,'CD1_2',/silent)
@@ -164,7 +164,7 @@ pro ifsr_rebin,infile,outfile,factor,xlim,ylim,applydq=applydq,$
  
 ;  Write output
 
-   if datext ne 0 then begin
+   if datext gt 0 then begin
       writefits,outfile,cube.phu,newheader_phu
       writefits,outfile,dat_rb,newheader_dat,/append
    endif else begin
