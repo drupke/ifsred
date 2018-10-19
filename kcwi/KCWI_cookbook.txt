@@ -1,0 +1,99 @@
+This cookbook uses routines from IFSRED and at least one routine from
+the IFSFIT package.
+
+The default wavelength calibration uses a ThAr atlas and linelist that
+doesn't correspond well to the lamp currently in use at Keck. I
+carefully calibrated a KCWI lamp spectrum using IRAF's IDENTIFY
+task. The vast majority of lines turn out to be simply argon lines, as
+I identified by comparing the Keck ThAr and FeAr spectra. This makes
+the actual line identification much easier, since there are a plethora
+of possible lines.
+
+Before getting started, copy the thar.fits and thar_list.txt files to
+the .../KcwiDRP/data/ subdirectory. This recalibrated atlas (using
+Keck's own lamp) applies to the BL grating and medium slicer with
+central wavelength 4500 A.
+
+> kcwi_prep,'path_to_raw','path_to_red',/nonas,verb=1,disp=2
+
+> kcwi_stage1
+
+If you're happy with the scattered light subtraction from the
+pipeline, then just run
+
+> kcwi_stage2dark
+
+Else first stack your data along each column. I use PyRAF to do this:
+
+--> scombine kb180615_00055_int.fits kb180615_00055_int_stack group=all
+
+I then display the spectrum with SPLOT and create a text file of the
+minimum point or points in each interslice gap for fitting scattered
+light; one line per pixel region with a beginning and ending pixel for
+fitting.
+
+I then create a script to call IFSR_KCWISCATSUB (from my IFSRED
+package) with the correct input parameters. IFSR_KCWISCATSUB calls
+MPFITFUN to fit the scattered light across slices. Here's a script
+that fits a 4th-degree polynomial to each half of the data, plotting
+the results as it goes:
+
+pro ifsr_kcwiscatsub_script
+   polydeg=4
+   ;  initialize parinfo
+   parinfo = REPLICATE({value:0d, fixed:0b, limited:[0B,0B], tied:'', $
+                        limits:[0d,0d]},npar)
+   ifsr_kcwiscatsub,'data.fits','gaps.dat','ifsr_kcwiscatfun_polygauss',$
+	            parinfo,argscatfun={splitpoly: 1b},/plots,sigclip=3d
+end
+
+If you do the scattered light subtraction with my routine instead of
+KCWI_STAGE2DARK, you also have to copy the VAR and MSK files over for
+the next stage:
+% cp var.fits vard.fits
+  cp msk.fits mskd.fits
+
+> kcwi_stage3geom
+
+> kcwi_stage4flat
+
+To select the correct regions for sky subtraction, you open the image
+up in DS9 and select the regions you want to use for sky subtraction
+(or select the regions to mask; I can't remember which way it
+goes). Then save this region as a DS9 region and run this python
+script:
+
+$ python .../KcwiDRP/devel/kcwi_masksky_ds9.py intf.fits smsk.reg
+
+There is also a way to specify the sky from another frame for sky
+subtraction, but that's a little more complicated.
+
+> kcwi_stage5sky				       
+
+> kcwi_stage6cube
+
+> kcwi_stage7dar
+
+> kcwi_stage8std
+
+At this stage you want to resample to (spatially) square spaxels:
+
+> ifsr_kcwiresample,'kb18xxyy_abcde','cube.fits',[6,16,29,81]
+
+To mosaic the cubes requires some reference point. For a quasar this
+is relatively easy. First, fit the center:
+
+> cube = ifsf_readcube('cube.fits',/quiet,datext=-1,varext=1,dqext=2)
+  peak = ifsr_peak(cube,[3500,5500],xranf=[22,33],yranf=[31,42])
+Peak flux at [27.8,35.4] (single-offset indices) is 2.17E-01
+X/Y half-widths: 3.35 / 2.99
+
+Then attach the peak location to the header:
+
+--> hedit cube[0] XPEAK "27.8" add+ ver-
+    hedit cube[0] YPEAK "35.4" add+ ver-
+
+> ifsr_mosaic,['cube1.fits','cube2.fits',...],'outcube.fits',indir='dir',/nophu
+
+If the quasar is not very well centered, use the option /nocen for
+better results.
