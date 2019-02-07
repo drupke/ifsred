@@ -85,6 +85,25 @@ pro ifsr_kcwiresample,instr,outfile,goodreg
    newmsk[ibad] = 1
    newmsk = fix(newmsk)
 
+;  Adjust CD matrix for resampling.
+;  This only works for PA=0 right now!
+;  To get it working for other PAs, have to interpret CD matrix properly.
+;   ra = sxpar(ihead,'CRVAL1',/silent)
+   pa = sxpar(ihead,'ROTPOSN',/silent)
+   if fix(pa) eq 0 then begin
+      print,'IFSR_KCWIRESAMPLE: PA = 0, so adjusting CD1_1 for resampling.'
+      oldcdx = sxpar(ihead,'CD1_1',/silent)
+      oldcdy = sxpar(ihead,'CD2_2',/silent)
+      newcdy = oldcdy
+      newcdx = oldcdx*double(dx)/double(newdx)
+      sxaddpar,ihead,'CD1_1',newcdx
+      sxaddpar,ihead,'CD2_2',newcdy
+      sxaddpar,vhead,'CD1_1',newcdx
+      sxaddpar,vhead,'CD2_2',newcdy
+      sxaddpar,mhead,'CD1_1',newcdx
+      sxaddpar,mhead,'CD2_2',newcdy
+   endif
+
    mwrfits,newdat,outfile,ihead,/create
    mwrfits,newvar,outfile,vhead
    mwrfits,newmsk,outfile,mhead

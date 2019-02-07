@@ -54,9 +54,11 @@
 ;      2016sep12, DSNR, added NOPHU option
 ;      2018sep28, DSNR, small bug fixes for doing large mosaics where
 ;                       source not centered
+;      2018nov04, DSNR, bug fix of variance computation. Was overestimating
+;                       variance by factor of Nexp
 ;
 ; :Copyright:
-;    Copyright (C) 2014--2016 David S. N. Rupke
+;    Copyright (C) 2014--2018 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -276,7 +278,8 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
            good = where(varnewall[i,j,k,*] ne noval AND $
                         dqnewall[i,j,k,*] eq 0,ctg)
            if ctg gt 0 then begin
-              varnew[i,j,k] = median(varnewall[i,j,k,good],/double,/even)
+;              varnew[i,j,k] = median(varnewall[i,j,k,good],/double,/even)
+              varnew[i,j,k] = total(varnewall[i,j,k,good],/double)/double(ctg)^2d
            endif else begin
               varnew[i,j,k] = 0
            endelse

@@ -70,7 +70,7 @@
 pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
                  nophu=nophu,ignorepar=ignorepar,reversevardq=reversevardq,$
                  waveext=waveext,invvar=invvar
-
+                 
    if keyword_set(nophu) then begin
       datext=-1
       varext=1
@@ -97,8 +97,8 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    dx = cube.ncols
    dy = cube.nrows
 
-   map_x = rebin(dindgen(dx)+1,dx,dy)
-   map_y = rebin(transpose(dindgen(dy)+1),dx,dy)
+   map_x = rebin(dindgen(dx) + 1d,dx,dy)
+   map_y = rebin(transpose(dindgen(dy) + 1d),dx,dy)
    if keyword_set(spaxlist) then begin
       isum = []
       for i=0,n_elements(spaxlist[*,0])-1 do begin
@@ -155,7 +155,7 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
       if outdq[i] gt 0b then outdq[i] = 1b
    endfor      
 
-   fxhmake,outhead,/extend,/date
+;   fxhmake,outhead,/extend,/date
 
    if ~ keyword_set(nophu) then $
       fxhmake,outheaddat,outdat,/xtension,/date $
