@@ -2,7 +2,8 @@
 ;
 ;+
 ;
-; Rebin data cube.
+; Open a FITS data cube, call IFSR_MAKELINEMAP to create a linemap, and write the
+; linemap to disk.
 ;
 ; :Categories:
 ;    IFSRED
@@ -26,6 +27,7 @@
 ;    ChangeHistory::
 ;      2018nov04, DSNR, created
 ;      2019jan25, DSNR, separated IFSR_MAKELINEMAP into subroutine
+;      2019mar04, DSNR, moved IFSR_MAKELINEMAP to separate file
 ;
 ; :Copyright:
 ;    Copyright (C) 2018-19 David S. N. Rupke
@@ -45,49 +47,6 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-function ifsr_makelinemap,cube,wavesum,wavesub=wavesub
-
-   ;  Get linemap
-   linesum = ifsr_wavesum(cube,wavesum,/average,npix=npix,/applydq)
-   linesumdat = linesum[*,*,0]
-   linesumvar = linesum[*,*,1]
-   igdline = where(linesumdat gt 0,ctgdline)
-   ;  Subtract continuum if requested
-   if keyword_set(wavesub) then begin
-      subsumdat = dblarr(cube.ncols,cube.nrows)
-      subsumvar = dblarr(cube.ncols,cube.nrows)
-      subsumdq = dblarr(cube.ncols,cube.nrows)
-      sizews = size(wavesub)
-      if sizews[0] eq 1 then nws=1
-      if sizews[0] eq 2 then nws=sizews[2]
-      for i=0,nws-1 do begin
-         subsum_tmp = ifsr_wavesum(cube,wavesub[*,i],/average,/applydq)
-         subsumdat_tmp = subsum_tmp[*,*,0]
-         subsumvar_tmp = subsum_tmp[*,*,1]
-         igddat = where(subsumdat_tmp gt 0,ctgddat)
-         subsumdat[igddat] += subsumdat_tmp[igddat]
-         subsumvar[igddat] += subsumvar_tmp[igddat]
-         subsumdq[igddat] += 1d
-      endfor
-      ;     average over number of regions
-      igddat = where(subsumdq gt 0d,ctgddat)
-      subsumdat[igddat] /= subsumdq[igddat]
-      subsumvar[igddat] /= subsumdq[igddat]
-      ;     subtract
-      linesumdat[igdline] -= subsumdat[igdline]
-      linesumvar[igdline] += subsumvar[igdline]
-   endif
-   ;  ... and return to total flux rather than average per A. Also
-   ;  multiply by dispersion to convert from flux/A to flux
-   linesumdat[igdline] *= double(npix)*cube.cdelt
-   linesumvar[igdline] *= double(npix)*cube.cdelt^2d
-
-   linesum = {dat: linesumdat, var: linesumvar}
-   
-   return,linesum
-
-end
-
 pro ifsr_linemap,infile,outfile,wavesum,wavesub=wavesub,$
                  datext=datext,varext=varext,dqext=dqext
 
