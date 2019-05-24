@@ -25,9 +25,10 @@
 ; :History:
 ;    ChangeHistory::
 ;      2018dec29, DSNR, created
+;      2019apr01, DSNR, fixed variance calculation
 ;
 ; :Copyright:
-;    Copyright (C) 2018 David S. N. Rupke
+;    Copyright (C) 2018--2019 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -80,7 +81,7 @@ pro ifsr_vorbin,invorfile,incube,outcube,$
             binvar += cube.var[xind[ibin[j]],yind[ibin[j]],*]
          endfor
          bindat /= double(ctbin)
-         binvar /= double(ctbin)
+         binvar /= double(ctbin)^2d
          for j=0,ctbin-1 do begin
             newcube[xind[ibin[j]],yind[ibin[j]],*] = bindat
             newvar[xind[ibin[j]],yind[ibin[j]],*] = binvar

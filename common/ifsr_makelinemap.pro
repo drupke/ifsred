@@ -25,6 +25,8 @@
 ; :History:
 ;    ChangeHistory::
 ;      2019mar04, DSNR, moved IFSR_MAKELINEMAP to separate file from IFSR_LINEMAP
+;      2019may22, DSNR, keyword ALLOWNEG allows negative fluxes in computing 
+;                       continuum region averages to subtract
 ;
 ; :Copyright:
 ;    Copyright (C) 2019 David S. N. Rupke
@@ -44,7 +46,7 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-function ifsr_makelinemap,cube,wavesum,wavesub=wavesub
+function ifsr_makelinemap,cube,wavesum,wavesub=wavesub,allowneg=allowneg
 
    ;  Get linemap
    linesum = ifsr_wavesum(cube,wavesum,/average,npix=npix,/applydq)
@@ -63,7 +65,12 @@ function ifsr_makelinemap,cube,wavesum,wavesub=wavesub
          subsum_tmp = ifsr_wavesum(cube,wavesub[*,i],/average,/applydq)
          subsumdat_tmp = subsum_tmp[*,*,0]
          subsumvar_tmp = subsum_tmp[*,*,1]
-         igddat = where(subsumdat_tmp gt 0,ctgddat)
+         if keyword_set(allowneg) then begin
+            igddat = where(subsumdat_tmp ne 0,ctgddat)
+         endif else begin
+            igddat = where(subsumdat_tmp gt 0,ctgddat)
+            print,'IFSR_MAKELINEMAP: Computing continuum region averages from positive fluxes only.'
+         endelse
          subsumdat[igddat] += subsumdat_tmp[igddat]
          subsumvar[igddat] += subsumvar_tmp[igddat]
          subsumdq[igddat] += 1d

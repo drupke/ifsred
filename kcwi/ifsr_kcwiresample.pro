@@ -22,9 +22,10 @@
 ; :History:
 ;    ChangeHistory::
 ;      2018aug10  DSNR  created
+;      2019mar28  DSNR  fixed resampling scale to keep constant total flux
 ;
 ; :Copyright:
-;    Copyright (C) 2018 David S. N. Rupke
+;    Copyright (C) 2018--2019 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -71,10 +72,10 @@ pro ifsr_kcwiresample,instr,outfile,goodreg
       for j=0,dy-1 do begin
          newdat[*,j,i] = $
             interpol(dat[goodreg[0]-1:goodreg[2]-1,goodreg[1]-1+j,i],$
-                     yarr,newyarr)
+                     yarr,newyarr)*pxscl/slscl
          newvar[*,j,i] = $
             interpol(var[goodreg[0]-1:goodreg[2]-1,goodreg[1]-1+j,i],$
-                     yarr,newyarr)
+                     yarr,newyarr)*pxscl/slscl
          newmsk[*,j,i] = $
             interpol(msk[goodreg[0]-1:goodreg[2]-1,goodreg[1]-1+j,i],$
                      yarr,newyarr)

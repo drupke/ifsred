@@ -48,7 +48,8 @@
 ;
 ;-
 pro ifsr_linemap,infile,outfile,wavesum,wavesub=wavesub,$
-                 datext=datext,varext=varext,dqext=dqext
+                 datext=datext,varext=varext,dqext=dqext,subsampleout=subsampleout,$
+                 subsamplefac=subsamplefac
 
    bad=1d99
 
@@ -62,6 +63,15 @@ pro ifsr_linemap,infile,outfile,wavesum,wavesub=wavesub,$
 
    linesum = ifsr_makelinemap(cube,wavesum,wavesub=wavesub)
 
+;  Subsampling interpolation
+   if keyword_set(subsampleout) then begin
+      if ~ keyword_set(subsamplefac) then subsamplefac=10d
+      xresamp = (dindgen(cube.ncols*subsamplefac)-subsamplefac/2d + 0.5d)/subsamplefac
+      yresamp = (dindgen(cube.nrows*subsamplefac)-subsamplefac/2d + 0.5d)/subsamplefac
+      interp = interpolate(linesum.dat,xresamp,yresamp,/double,/grid,cubic=-0.5)
+      writefits,subsampleout,interp,header.dat
+   endif
+
    appenddat=0b
    if datext eq 1 then begin
       writefits,outfile,[],header.phu
@@ -69,5 +79,6 @@ pro ifsr_linemap,infile,outfile,wavesum,wavesub=wavesub,$
    endif
    writefits,outfile,linesum.dat,header.dat,append=appenddat
    writefits,outfile,linesum.var,header.var,/append
+   
 
 end
