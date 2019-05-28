@@ -1,0 +1,60 @@
+FIT [OI] FLUXES AND WAVELENGTHS
+
+This step uses IFSFIT to find the wavelength of [OI]6300 for each
+spaxel to make tweaks to the wavelength calibration.
+
+IDL> ifsf,'ifsf_galname',skyexp='a',/oned
+     ifsf,'ifsf_galname',skyexp='b',/oned
+     ...
+     ifsfa,'ifsf_galname',skyexp='a',/oned,/noplots
+     ifsfa,'ifsf_galname',skyexp='b',/oned,/noplots
+     ...
+
+DAR
+
+IDL> ifsr_dar,'/path/to/data/cube.fits',4,4,xranf=[15,33],yranf=[15,35],xranp=[21,23],yranp=[24,26],/circ,sig=10
+  ...
+
+COMBINE DATA
+
+Line up data by finding a common peak.
+
+> cube = ifsf_readcube('/path/to/data/dcube_a.fits',/quiet)
+  peak = ifsr_peak(cube,[6400,6800],xranf=[15,33],yranf=[15,35])
+Peak flux at [21.9,24.7] is 1.89E+00
+X/Y-widths: 2.76 / 2.69
+  ...
+
+Mosaic data:
+
+> ifsr_mosaic,['dcube_a.fits','dcube_b.fits',...],'/path/to/output/file.fits',indir='/path/to/input/data/'
+
+REBIN IMAGE
+
+IDL> ifsr_rebin,'/path/to/mosaic/file.fits','/path/to/output/file.fits',3,[2,46],[2,52]
+
+TELLURIC CORRECTION
+
+IDL> ifsr_telcor,'/path/to/input/file.fits','/path/to/output/file.fits,'/path/to/telluric/correction.fits',am=1.05,wvcor=0.25
+
+ROTATION
+
+Cube has to be rotated to achieve correct orientation.
+
+IDL> ifsr_fliprot,'/path/to/in/file.fits','/path/to/out/file.fits',/yflip
+
+VORONOI BIN
+
+> ifsr_linemap,’input_datacube.fits’,’output_linemap.fits’,[wavelo_sum,wavehi_sum],wavesub=[[wavelo_sub1,wavehi_sub1],[wavelo_sub2,wavehi_sub2]]
+
+- If you want a subsampled linemap (by, e.g., a factor of 10) then you
+  can add these keywords:
+  subsamplefac=10d,subsampleout=’output_subsampled_linemap.fits'
+
+- If you want the routine to include negative fluxes when doing the
+  continuum subtraction (depends on the situation), add the keyword
+  /allowneg.
+
+> ifsr_voronoi,’input_linemap.fits’,[center_x,center_y],targetSN,thresholdSN,’output_voronoibins.xdr’
+
+> ifsr_vorbin,’input_voronoibins.xdr’,’input_datacube.fits’,’output_voronoi_binned_datacube.fits'

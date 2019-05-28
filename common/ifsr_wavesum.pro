@@ -2,17 +2,30 @@
 ;
 ;+
 ;
-; Rebin data cube.
+; Sum data cube over a wavelength range.
 ;
 ; :Categories:
 ;    IFSRED
 ;
 ; :Returns:
-;    Rebinned data cube.
+;    X x Y x 2 array (with X and Y spatial dimensions) containing data
+;    and variance.
 ;
 ; :Params:
+;    cube: in, required, type=structure
+;      Structure with input data cube; output of IFSF_READCUBE.
+;    wavesum: in, required, type=dblarr(2)
+;      Lower and upper limits of wavelength region over which to sum.
 ;
 ; :Keywords:
+;    applydq: in, optional, type=bool
+;      Apply DQ plane.
+;    average: in, optional, type=bool
+;      Calculate average flux/A instead of total flux. If there are
+;      missing pixels, the total flux calculation adds back in the
+;      missing pixels as having the average flux.
+;    npix: out, optional, type=int
+;      Maximum number of pixels summed over wavelength.
 ;
 ; :Author:
 ;    David S. N. Rupke::

@@ -6,24 +6,31 @@ IFSRED is a general-purpose library for reducing data from integral
 field spectrographs (IFSs). For a general IFS data cube, it contains
 routines to do the following:
 
-- find and apply a zero-point shift in a wavelength solution on a
-  spaxel-by-spaxel basis, using sky lines [in conjunction with IFSFIT
-  -- see requirements below]
-- find the spatial coordinates of a flux peak
+- apply a telluric correction [IFSR_TELCOR]
 - empirically correct for differential atmospheric refraction
-- mosaic dithered exposures 
-- (integer) rebin
-- apply a telluric correction
-- sky subtract
+- find and apply a zero-point shift in a wavelength solution on a
+  spaxel-by-spaxel basis, using sky lines [IFSF_SKY; in conjunction
+  with IFSFIT -- see requirements below]
+- find the spatial coordinates of a flux peak [IFSR_PEAK]
+- flip/rotate a data cube [IFSR_FLIPROT]
+- Gaussian smooth to seeing-match data [IFSR_BLUR]
+- mosaic dithered exposures [IFSR_MOSAIC]
+- rebin [IFSR_REBIN]
+- sum over wavelength to make a linemap [IFSR_LINEMAP,
+  IFSR_MAKELINEMAP, IFSR_WAVESUM]
+- sum over spatial apertures into a single spectrum [IFSR_SPAXSUM]
+- sky subtract [IFSR_SKYSUB]
+- Voronoi bin [IFSR_VORBIN, IFSR_VORONOI]
 
 IFSRED also contains various routines for instrument-specific
 reduction or analysis:
 - GMOS
-- NIFS
-- OSIRIS
 - KCWI
 - MaNGA
-- S7
+- NIFS
+- OSIRIS
+- SDSS
+- WiFeS [S7]
 
 -------------------------------------------------------------------------
 REQUIREMENTS
@@ -42,23 +49,16 @@ IDL libraries:
 - Coyote
   http://www.idlcoyote.com/documents/programs.php#COYOTE_LIBRARY_DOWNLOAD
   [or from the subversion repository: https://code.google.com/p/idl-coyote/]
+- VORONOI_2D_BINNING
+  https://www-astro.physics.ox.ac.uk/~mxc/software/#binning
+  [for Voronoi binning]
 
 -------------------------------------------------------------------------
 USAGE
 -------------------------------------------------------------------------
 
-The IRAF routines in this package (in the subdirectory 'gmos/iraf/')
-can be used by simply copying them to the proper directory. For a
-Ureka installation, this directory is
-
-/Your/path/Ureka/variants/common/iraf/gemini/gmos/
-
-For help with the individual IDL routines, see the documentation of
-each routine.
-
-The EXAMPLE.txt file walks through the data reduction of a full data
-cube, using Gemini IRAF tasks, the routines included in this package,
-and the routines included in the IFSFIT package (see requirements).
+For help with individual IDL routines, see the documentation of each
+routine.
 
 -------------------------------------------------------------------------
 QUESTIONS? BUGS? WANT TO MODIFY THE CODE?
@@ -73,7 +73,7 @@ Modifications are encouraged, but subject to the license.
 LICENSE AND COPYRIGHT
 -------------------------------------------------------------------------
 
-Copyright (C) 2014--2018 David S. N. Rupke
+Copyright (C) 2014--2019 David S. N. Rupke
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

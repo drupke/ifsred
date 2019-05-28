@@ -8,11 +8,21 @@
 ;    IFSRED
 ;
 ; :Returns:
-;    Rebinned data cube.
+;    Structure containing linemap and variance.
 ;
 ; :Params:
+;    cube: in, required, type=structure
+;      Structure with input data cube; output of IFSF_READCUBE.
+;    wavesum: in, required, type=dblarr(2)
+;      Lower and upper limits of wavelength region over which to sum.
 ;
 ; :Keywords:
+;    allowneg: in, optional, type=boolean
+;      Default is to calculate continuum fluxes using positive values
+;      only; this allows negative fluxes in the computation as well.
+;    wavesub: in, optional, type=dblarr(2,N)
+;      Lower and upper wavelength regions for subtraction continuum.
+;      E.g., [5000,5100] or [[4800,4900],[5000,5100]].
 ;
 ; :Author:
 ;    David S. N. Rupke::
@@ -93,4 +103,3 @@ function ifsr_makelinemap,cube,wavesum,wavesub=wavesub,allowneg=allowneg
    return,linesum
 
 end
-

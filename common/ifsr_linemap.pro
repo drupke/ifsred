@@ -2,19 +2,36 @@
 ;
 ;+
 ;
-; Open a FITS data cube, call IFSR_MAKELINEMAP to create a linemap, and write the
-; linemap to disk.
+; Open a FITS data cube, call IFSR_MAKELINEMAP to create a linemap,
+; and write the linemap to disk.
 ;
 ; :Categories:
 ;    IFSRED
 ;
 ; :Returns:
-;    Rebinned data cube.
+;    Output FITS file with linemap and variance.
 ;
 ; :Params:
+;    infile: in, required, type=string
+;      Path and filename of input file.
+;    outfile: in, required, type=string
+;      Path and filename of output file.
+;    wavesum: in, required, type=dblarr(2)
+;      Lower and upper limits of wavelength region over which to sum.
 ;
 ; :Keywords:
-;
+;    allowneg: in, optional, type=boolean
+;      Default is to calculate continuum fluxes using positive values
+;      only; this allows negative fluxes in the computation as well.
+;    subsamplefac: in, optional, type=double
+;      Factor by which to interpolate to a smaller grid.
+;    subsampleout: out, optional, type=string
+;      Paht and filename of output file if subsampling.
+;    wavesub: in, optional, type=dblarr(2,N)
+;      Lower and upper wavelength regions for subtraction continuum.
+;      E.g., [5000,5100] or [[4800,4900],[5000,5100]].
+;    
+;      
 ; :Author:
 ;    David S. N. Rupke::
 ;      Rhodes College
@@ -28,9 +45,11 @@
 ;      2018nov04, DSNR, created
 ;      2019jan25, DSNR, separated IFSR_MAKELINEMAP into subroutine
 ;      2019mar04, DSNR, moved IFSR_MAKELINEMAP to separate file
+;      2019may22, DSNR, keyword ALLOWNEG allows negative fluxes in computing 
+;                       continuum region averages to subtract
 ;
 ; :Copyright:
-;    Copyright (C) 2018-19 David S. N. Rupke
+;    Copyright (C) 2018--2019 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -47,9 +66,12 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro ifsr_linemap,infile,outfile,wavesum,wavesub=wavesub,$
-                 datext=datext,varext=varext,dqext=dqext,subsampleout=subsampleout,$
-                 subsamplefac=subsamplefac
+pro ifsr_linemap,infile,outfile,wavesum,allowneg=allowneg,$
+                 subsampleout=subsampleout,$
+                 subsamplefac=subsamplefac,$
+                 wavesub=wavesub,$
+                 datext=datext,varext=varext,dqext=dqext,$
+
 
    bad=1d99
 
@@ -61,7 +83,7 @@ pro ifsr_linemap,infile,outfile,wavesum,wavesub=wavesub,$
    cube = ifsf_readcube(infile,header=header,datext=datext,varext=varext,$
                         dqext=dqext,/quiet)
 
-   linesum = ifsr_makelinemap(cube,wavesum,wavesub=wavesub)
+   linesum = ifsr_makelinemap(cube,wavesum,wavesub=wavesub,allowneg=allowneg)
 
 ;  Subsampling interpolation
    if keyword_set(subsampleout) then begin
