@@ -2,17 +2,41 @@ This cookbook uses routines from IFSRED and at least one routine from
 the IFSFIT package.
 
 The default wavelength calibration uses a ThAr atlas and linelist that
-doesn't correspond well to the lamp currently in use at Keck. I
-carefully calibrated a KCWI lamp spectrum using IRAF's IDENTIFY
-task. The vast majority of lines turn out to be simply argon lines, as
-I identified by comparing the Keck ThAr and FeAr spectra. This makes
-the actual line identification much easier, since there are a plethora
-of possible lines.
+doesn't correspond well to the lamp currently in use at Keck,
+resulting in a large RMS. I carefully calibrated a KCWI lamp spectrum
+using IRAF's IDENTIFY task. The vast majority of lines turn out to be
+simply argon lines, as I identified by comparing the Keck ThAr and
+FeAr spectra. This makes the actual line identification much easier,
+since there are a plethora of possible lines. It also results in a
+very good RMS (of order ~0.1 A).
 
-Before getting started, copy the thar.fits and thar_list.txt files to
-the .../KcwiDRP/data/ subdirectory. This recalibrated atlas (using
-Keck's own lamp) applies to the BL grating and medium slicer with
-central wavelength 4500 A.
+The comparison can be seen in the file
+thar_vs_fear_kb180615_00030.pdf. I divided the wavelength range into
+four parts and made plots from ThAr and FeAR (that overlap when overlaid on each other) using IMPLOT in IRAF. This file has the following format:
+page 1: ThAr bluest
+page 2: FeAr bluest
+page 3: ThAr bluer
+page 4: FeAr bluer
+page 5: ThAr redder
+... etc.
+I used these to line up ThAr and FeAr lines by-eye and identify lines
+in common between the two, which are presumably Ar lines. These I
+marked with a purple vertical line. Lines unique to either lamp I
+marked with a green +.
+
+The ThAr lamp in Keck was changed in fall 2018, and part of the
+mismatch in early 2018 was due to the aging lamp, whcih weakened the
+Th lines. They are stronger in late fall 2018 data. However, there is
+still a big mismatch between the DRP template and the data, so I still
+created my own templates for calibration.
+
+Before getting started, copy the template of interest (labeled here by
+date) to thar.fits and thar_list.txt files in the .../KcwiDRP/data/
+subdirectory. This recalibrated atlas (using Keck's own lamp) applies
+to the BL grating and medium slicer with central wavelength 4500 A.
+
+Alternatively, you can create your own template -- if you need to know
+how, send me an email (drupke@gmail.com).
 
 > kcwi_prep,'path_to_raw','path_to_red',/nonas,verb=1,disp=2
 

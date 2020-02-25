@@ -24,11 +24,19 @@
 ;      keyword SPAXLIST set.
 ;      
 ; :Keywords:
-;    fluxmult: in, optional, type=double
-;      Multiplier for flux in each spaxel.
 ;    invvar: in, optional, type=byte
 ;      Set if the data cube holds inverse variance instead of variance. The
 ;      output structure will still contain the variance.
+;    rotpa: in, optional, type=double
+;      PA to rotate image before extracting. For, e.g., a long-slit aperture,
+;      select PA of aperture in degrees E of N. Image will rotate in other direction
+;      but extraction will be in the correct sense.
+;    rotcent: in, optional, type=dblarr(2)
+;      Center of rotation, in integer single-offset coordinates
+;    spaxarea: in, optional, type=double
+;      If the input fluxes are per arcsec^2, this keyword specifies the
+;      area in square arcseconds for a spaxel so that the output is in flux
+;      rather than surface brightness.
 ;    spaxlist: in, optional, type=dblarr(Nspax,2)
 ;      List of spaxels to combine. If this is chosen, SUMPAR parameter is ignored.
 ;    waveext: in, optional, type=integer
@@ -48,9 +56,11 @@
 ;      2015may15, DSNR, added SPAXLIST option
 ;      2016sep12, DSNR, added NOPHU option
 ;      2018feb08, DSNR, added WAVEEXT and INVVAR keywords
+;      2019jun28, DSNR, added SPAXAREA keyword
+;      2019jul08, DSNR, added ROTPA and ROTCENT keywords
 ;
 ; :Copyright:
-;    Copyright (C) 2015--2018 David S. N. Rupke
+;    Copyright (C) 2015--2019 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -69,7 +79,8 @@
 ;-
 pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
                  nophu=nophu,ignorepar=ignorepar,reversevardq=reversevardq,$
-                 waveext=waveext,invvar=invvar
+                 waveext=waveext,invvar=invvar,spaxarea=spaxarea,rotpa=rotpa,$
+                 rotcent=rotcent
                  
    if keyword_set(nophu) then begin
       datext=-1
@@ -79,7 +90,7 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
          varext=2
          dqext=1
       endif
-      appenddat=0b
+      create=1b
    endif else begin
       datext=1
       varext=2
@@ -88,12 +99,13 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
          varext=3
          dqext=2
       endif
-      appenddat=1b
+      create=0b
    endelse
    if ~ keyword_set(waveext) then waveext=0
    if ~ keyword_set(invvar) then invvar=0
+   header=1b
    cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext,$
-                        waveext=waveext,invvar=invvar)
+                        waveext=waveext,invvar=invvar,header=header)
    dx = cube.ncols
    dy = cube.nrows
 
@@ -145,12 +157,28 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    outdat=dblarr(cube.nz)
    outvar=dblarr(cube.nz)
    outdq=bytarr(cube.nz)
+   fluxmult=1d
+   if keyword_set(spaxarea) then fluxmult = spaxarea
    for i=0,cube.nz-1 do begin
       outdattmp = cube.dat[*,*,i]
       outvartmp = cube.var[*,*,i]
       outdqtmp = cube.dq[*,*,i]
-      outdat[i] = total(outdattmp[isum]*weights)
-      outvar[i] = total(outvartmp[isum]*weights)
+;     Documentation of ROT doesn't specify that rotation center
+;     is in zero-offset coordinates but I tested it. Rotation can't be 
+;     around a non-integer pixel center. The pivot keyword is unnecessary
+;     if ROTCENT is the center of the image.
+;     Do nearest-neighbor interpolation if it's a bad pixel mask.
+      if keyword_set(rotpa) AND keyword_set(rotcent) then begin
+         outdattmp = rot(outdattmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,cubic=-0.5,$
+                         /pivot)
+         outvartmp = rot(outvartmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,cubic=-0.5,$
+                         /pivot)
+         outdqtmp = rot(outdqtmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,$
+                         /pivot)
+      endif
+      outdat[i] = total(outdattmp[isum]*weights)*fluxmult
+; I *think* dat/err should not change when going from S.B. to flux . ..
+      outvar[i] = total(outvartmp[isum]*weights)*fluxmult^2d
       outdq[i] = total(outdqtmp[isum]*weights)
       if outdq[i] gt 0b then outdq[i] = 1b
    endfor      
@@ -158,7 +186,7 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
 ;   fxhmake,outhead,/extend,/date
 
    if ~ keyword_set(nophu) then $
-      fxhmake,outheaddat,outdat,/xtension,/date $
+      fxhmake,outhead,outdat,/xtension,/date $
    else $
       fxhmake,outheaddat,outdat,/extend,/date
    sxaddpar,outheaddat,'EXTNAME','SCI'
@@ -190,16 +218,16 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    sxaddpar,outheaddq,'CD1_1',cube.cdelt
    sxaddpar,outheaddq,'CDELT1',cube.cdelt
 
-   if ~ keyword_set(nophu) then writefits,outfile,[],outhead
-   writefits,outfile,outdat,outheaddat,append=appenddat
+   if ~ keyword_set(nophu) then mwrfits,[],outfile,header.phu,/create
+   mwrfits,outdat,outfile,outheaddat,create=create
    if keyword_set(reversevardq) then begin
-      writefits,outfile,outdq,outheaddq,/append
-      writefits,outfile,outvar,outheadvar,/append
+      mwrfits,outdq,outfile,outheaddq
+      mwrfits,outvar,outfile,outheadvar
    endif else begin
-      writefits,outfile,outvar,outheadvar,/append
-      writefits,outfile,outdq,outheaddq,/append
+      mwrfits,outvar,outfile,outheadvar
+      mwrfits,outdq,outfile,outheaddq
    endelse
    if keyword_set(waveext) then $
-      writefits,outfile,cube.wave,header_wave,/append
+      mwrfits,cube.wave,outfile,header_wave
 
 end

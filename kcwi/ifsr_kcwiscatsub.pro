@@ -43,7 +43,7 @@
 pro ifsr_kcwiscatsub,instr,gapfile,scatfun,parinfo,$
                      dy=dy,psfcent=psfcent,$
                      plots=plots,argscatfun=argscatfun,$
-                     sigclip=sigclip
+                     sigclip=sigclip,printcoeffs=printcoeffs
 
    if ~ keyword_set(dy) then dy=100
    if ~ keyword_set(plots) then plots=0 else plots=1
@@ -99,8 +99,9 @@ pro ifsr_kcwiscatsub,instr,gapfile,scatfun,parinfo,$
          coeffs = mpfitfun(scatfun,xbin,ybin,ybinerr,/nan,yfit=yfit,$
                            parinfo=parinfo,/quiet)
       if plots then begin
+         yran = [0,max([ybin,yfit])]
          cgplot,xbin,ybin,psym=16,err_ylo=ybinerr,err_yhi=ybinerr,/err_clip,$
-                err_col='Red'
+                err_col='Red',yran=yran
          cgoplot,xbin,yfit
       endif
 ;      3-sigma clip
@@ -119,6 +120,7 @@ pro ifsr_kcwiscatsub,instr,gapfile,scatfun,parinfo,$
             else $
                coeffs = mpfitfun(scatfun,xbin,ybin,ybinerr,/nan,yfit=yfit,$
                                  parinfo=parinfo,/quiet)
+            if keyword_set(printcoeffs) then print,coeffs
          endif
       endif
       ysurf[*,i] = yfit

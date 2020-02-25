@@ -17,6 +17,9 @@
 ;    Combined data cube. Header of cube is the same as the header of
 ;    the first exposure in the file list.
 ;    
+;    Note that data is median-combined, so that output flux is not summed. 
+;    Thus expected input flux is per unit time.
+;    
 ; :Params:
 ;    infiles: in, required, type=strarr
 ;      Filenames for data cubes of individual exposures.

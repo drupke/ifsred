@@ -19,6 +19,10 @@
 ;      Which extension to read.
 ;    header: out, optional, type=strarr
 ;      Optionally, output header.
+;    noctype: in, optional, type=byte
+;      Set if CTYPE header parameter not present. Linear solution then assumed.
+;    nodcflag: in, optional, type=byte
+;      Set if DCFLAG header parameter not present. Linear solution then assumed.
 ;    waveext: in, optional, type=integer
 ;      The extention number of a wavelength array.
 ;    
@@ -40,10 +44,11 @@
 ;                     this will work ...
 ;      2016aug24, DSNR, ported to IFSRED
 ;      2018feb08, DSNR, added WAVEEXT keyword
+;      2019nov13, DSNR, added keywords in case CTYPE, DCFLAG not present
 ;
 ;
 ; :Copyright:
-;    Copyright (C) 2016--2018 David S. N. Rupke
+;    Copyright (C) 2016--2019 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -60,7 +65,8 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-function ifsr_readspec,infile,extension=extension,header=header,waveext=waveext
+function ifsr_readspec,infile,extension=extension,header=header,waveext=waveext,$
+                       nodcflag=nodcflag,noctype=noctype
 
   errmsg=''
   
@@ -74,7 +80,13 @@ function ifsr_readspec,infile,extension=extension,header=header,waveext=waveext
      npix = n_elements(flux)/naps
      wave = dindgen(npix)
      ct = intarr(6)
-     ctype = sxpar(header,'CTYPE1',/silent,count=count)
+     if not keyword_set(noctype) then $
+        ctype = sxpar(header,'CTYPE1',/silent,count=count) $
+     else begin
+;       assume linear if no ctype
+        ctype = 'LINEAR  '
+        count = 1
+     endelse
      ct[0] = count
      crval = double(sxpar(header,'CRVAL1',/silent,count=count))
      ct[1] = count
@@ -84,7 +96,13 @@ function ifsr_readspec,infile,extension=extension,header=header,waveext=waveext
      ct[3] = count
      cd11  = double(sxpar(header,'CD1_1',/silent,count=count))
      ct[4] = count
-     dcflag= sxpar(header,'DC-FLAG',/silent,count=count)
+     if not keyword_set(nodcflag) then $
+        dcflag = sxpar(header,'DC-FLAG',/silent,count=count) $
+     else begin
+;       assume not log-linear if no DCFLAG
+        dcflag = 0b
+        count = 1
+     endelse
      ct[5] = count
 
      disp = cdelt

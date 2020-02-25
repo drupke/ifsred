@@ -58,9 +58,10 @@
 ;                       added detailed documentation
 ;      2015may18, DSNR, added option to re-write header
 ;      2016sep12, DSNR, added NOPHU option
+;      2020jan28, DSNR, added NaN rejection
 ;                       
 ; :Copyright:
-;    Copyright (C) 2014--2016 David S. N. Rupke
+;    Copyright (C) 2014--2020 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -110,8 +111,8 @@ function ifsr_peak,cube,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
                   yranfituse[0]:yranfituse[1],$
                   indrange[0]:indrange[1]]
 
-; Zero out DQed data
-  ibad = where(dqsub eq 1)
+; Zero out DQed or NANed data
+  ibad = where(dqsub eq 1 OR ~ finite(datsub))
   datsub[ibad] = 0
   varsub[ibad] = 0
 
