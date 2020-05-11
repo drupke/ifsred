@@ -58,9 +58,10 @@
 ;      2018feb08, DSNR, added WAVEEXT and INVVAR keywords
 ;      2019jun28, DSNR, added SPAXAREA keyword
 ;      2019jul08, DSNR, added ROTPA and ROTCENT keywords
+;      2020may05, DSNR, added ability to sum 2D images; added CUNIT1 and BUNIT to outputs
 ;
 ; :Copyright:
-;    Copyright (C) 2015--2019 David S. N. Rupke
+;    Copyright (C) 2015--2020 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -109,29 +110,35 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    dx = cube.ncols
    dy = cube.nrows
 
-   map_x = rebin(dindgen(dx) + 1d,dx,dy)
-   map_y = rebin(transpose(dindgen(dy) + 1d),dx,dy)
-   if keyword_set(spaxlist) then begin
-      isum = []
-      for i=0,n_elements(spaxlist[*,0])-1 do begin
-         itmp = where(map_x eq spaxlist[i,0] AND $
-                      map_y eq spaxlist[i,1])
-         isum = [isum,itmp]
-      endfor
+   if dy gt 1 then begin
+      map_x = rebin(dindgen(dx) + 1d,dx,dy)
+      map_y = rebin(transpose(dindgen(dy) + 1d),dx,dy)
+      if keyword_set(spaxlist) then begin
+         isum = []
+         for i=0,n_elements(spaxlist[*,0])-1 do begin
+            itmp = where(map_x eq spaxlist[i,0] AND $
+                         map_y eq spaxlist[i,1])
+            isum = [isum,itmp]
+         endfor
+      endif else begin
+         if n_elements(sumpar) eq 3 then begin
+;           Circular aperture
+            map_r = sqrt((map_x - double(sumpar[0]))^2d + $
+                         (map_y - double(sumpar[1]))^2d)
+            isum = where(map_r le double(sumpar[2]))
+         endif else if n_elements(sumpar) eq 4 then begin
+;           Square aperture
+            isumx = where(map_x ge double(sumpar[0]) AND $
+                          map_x le double(sumpar[2]))
+            isumy = where(map_y ge double(sumpar[1]) AND $
+                          map_y le double(sumpar[3]))
+            isum = cgsetintersection(isumx,isumy)
+         end else message,'Number of elements in SUMPAR must be 3 or 4.'
+      endelse
    endif else begin
-      if n_elements(sumpar) eq 3 then begin
-;        Circular aperture
-         map_r = sqrt((map_x - double(sumpar[0]))^2d + $
-                      (map_y - double(sumpar[1]))^2d)
-         isum = where(map_r le double(sumpar[2]))
-      endif else if n_elements(sumpar) eq 4 then begin
-;        Square aperture
-         isumx = where(map_x ge double(sumpar[0]) AND $
-                       map_x le double(sumpar[2]))
-         isumy = where(map_y ge double(sumpar[1]) AND $
-                       map_y le double(sumpar[3]))
-         isum = cgsetintersection(isumx,isumy)
-      end else message,'Number of elements in SUMPAR must be 3 or 4.'
+      print,'IFSR_SPAXSUM: Assuming dispersion direction along rows.'
+      map_x = dindgen(dx)
+      isum = dindgen(sumpar[1]-sumpar[0]+1)+sumpar[0]-1
    endelse
 
 ;  circular or square region to ignore
@@ -160,9 +167,16 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    fluxmult=1d
    if keyword_set(spaxarea) then fluxmult = spaxarea
    for i=0,cube.nz-1 do begin
-      outdattmp = cube.dat[*,*,i]
-      outvartmp = cube.var[*,*,i]
-      outdqtmp = cube.dq[*,*,i]
+      if dy gt 1 then begin
+         outdattmp = cube.dat[*,*,i]
+         outvartmp = cube.var[*,*,i]
+         outdqtmp = cube.dq[*,*,i]
+      endif else begin
+;        This assumes dispersion is along rows
+         outdattmp = cube.dat[i,*]
+         outvartmp = cube.var[i,*]
+         outdqtmp = cube.dq[i,*]
+      endelse
 ;     Documentation of ROT doesn't specify that rotation center
 ;     is in zero-offset coordinates but I tested it. Rotation can't be 
 ;     around a non-integer pixel center. The pivot keyword is unnecessary
@@ -197,6 +211,8 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    sxaddpar,outheaddat,'CRVAL1',cube.crval
    sxaddpar,outheaddat,'CD1_1',cube.cdelt
    sxaddpar,outheaddat,'CDELT1',cube.cdelt
+   if cube.cunit ne '' then sxaddpar,outheaddat,'CUNIT1',cube.cunit
+   if cube.bunit ne '' then sxaddpar,outheaddat,'BUNIT',cube.bunit
 
    fxhmake,outheadvar,outvar,/xtension,/date
    sxaddpar,outheadvar,'EXTNAME','VAR'
@@ -207,6 +223,8 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    sxaddpar,outheadvar,'CRVAL1',cube.crval
    sxaddpar,outheadvar,'CD1_1',cube.cdelt
    sxaddpar,outheadvar,'CDELT1',cube.cdelt
+   if cube.cunit ne '' then sxaddpar,outheadvar,'CUNIT1',cube.cunit
+   if cube.bunit ne '' then sxaddpar,outheadvar,'BUNIT',cube.bunit
 
    fxhmake,outheaddq,outdq,/xtension,/date
    sxaddpar,outheaddq,'EXTNAME','SCI'
@@ -217,6 +235,8 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    sxaddpar,outheaddq,'CRVAL1',cube.crval
    sxaddpar,outheaddq,'CD1_1',cube.cdelt
    sxaddpar,outheaddq,'CDELT1',cube.cdelt
+   if cube.cunit ne '' then sxaddpar,outheaddq,'CUNIT1',cube.cunit
+   if cube.bunit ne '' then sxaddpar,outheaddq,'BUNIT',cube.bunit
 
    if ~ keyword_set(nophu) then mwrfits,[],outfile,header.phu,/create
    mwrfits,outdat,outfile,outheaddat,create=create
