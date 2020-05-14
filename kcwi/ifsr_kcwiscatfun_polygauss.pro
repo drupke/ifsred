@@ -2,16 +2,37 @@
 ;
 ;+
 ;
+; Model for fitting scattered light to KCWI 2D data. Options include single
+; polynomial (default), two polynomials (one for first half of columns, one 
+; for second half), and a gaussian or moffat profile on top of the polynomials.
 ;
 ; :Categories:
 ;    IFSRED/KCWI
 ;
 ; :Returns:
-;
+;    Model evaluated at columns X.
+;    
 ; :Params:
-;
+;    X: in, required, type=dblarr
+;      Column numbers.
+;    P: in, required, type=dblarr(N)
+;      Model parameters. Polynomial parameters are first, followed by
+;      Gaussian or Moffat parameters as specified below.
+;      
 ; :Keywords:
-;
+;    gauss: in, optional, type=bin
+;      Add a gaussian profile to model. Calls function GAUSS1 packaged with
+;      MPFIT, with parameter order (MEAN, SIGMA, AREA).
+;    moffat: in, optional, type=bin
+;      Add a moffat profile to model. Calls function DRT_MOFFAT from DRTOOLS,
+;      with parameter order mimicking MPFIT version:
+;        A[0] = peak value
+;        A[1] = profile center
+;        A[2] = alpha = (FWHM/2)/sqrt[2^(1/beta)-1]
+;        A[3] = beta = "Moffat index"
+;    splitpoly: in, optional, type=bin
+;      If set, split column data in half and fit separate polymnomial to each.
+;       
 ; :Author:
 ;    David S. N. Rupke::
 ;      Rhodes College
@@ -23,9 +44,10 @@
 ; :History:
 ;    Change History::
 ;      2018aug14, DSNR, created
+;      2020may14, DSNR, documented
 ;
 ; :Copyright:
-;    Copyright (C) 2018 David S. N. Rupke
+;    Copyright (C) 2018--2020 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as

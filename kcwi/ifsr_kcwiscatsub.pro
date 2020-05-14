@@ -2,15 +2,39 @@
 ;
 ;+
 ;
+; Fit scattered light to 2D image across columns. Routine steps across rows,
+; starting with row 1, stacking DY rows and fitting scattered light as a 
+; function of column in each stacked block. 
+;
 ; :Categories:
 ;    IFSRED/KCWI
 ;
 ; :Returns:
+;    File INSTR_intd.fits with scattered light model subtracted.
 ;
 ; :Params:
+;    instr: in, required, type=string
+;      String that begins KCWI data file (e.g., kb181106_00032)
+;    gapfile: in, required, type=string
+;      File containing interslice regions to trace scattered light.
+;    scatfun: in, required, type=string
+;      Function input to MPFIT for fitting scattered light
+;    parinfo: in, required, type=structure
+;      PARINFO structure expected by MPFIT.
 ;
 ; :Keywords:
-;
+;    argscatfun: in, optional, type=structure
+;      Structure of keyword arguments to pass to SCATFUN.
+;    dy: in, optional, type=int, default=100
+;      Number of rows to sum for each fit.
+;    plots: in, optional, type=bin
+;      If set, plot each fit interactively. To move on to the next fit,
+;      type Return or Enter.
+;    printcoeffs: in, optional, type=bin
+;      If set, print best-fit parameters for each fit to STDOUT.
+;    sigclip: in, optional, type=double
+;      Sigma-clipping threshold to apply to points in each fit.
+;      
 ; :Author:
 ;    David S. N. Rupke::
 ;      Rhodes College
@@ -21,10 +45,11 @@
 ;
 ; :History:
 ;    ChangeHistory::
-;      2018aug11  DSNR  created
+;      2018aug11, DSNR, created
+;      2020may14, DSNR, documented
 ;
 ; :Copyright:
-;    Copyright (C) 2018 David S. N. Rupke
+;    Copyright (C) 2018--2020 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -41,9 +66,8 @@
 ;
 ;-
 pro ifsr_kcwiscatsub,instr,gapfile,scatfun,parinfo,$
-                     dy=dy,psfcent=psfcent,$
-                     plots=plots,argscatfun=argscatfun,$
-                     sigclip=sigclip,printcoeffs=printcoeffs
+                     argscatfun=argscatfun,dy=dy,plots=plots,$
+                     printcoeffs=printcoeffs,sigclip=sigclip
 
    if ~ keyword_set(dy) then dy=100
    if ~ keyword_set(plots) then plots=0 else plots=1
