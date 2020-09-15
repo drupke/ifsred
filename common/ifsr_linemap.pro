@@ -70,7 +70,7 @@ pro ifsr_linemap,infile,outfile,wavesum,allowneg=allowneg,$
                  subsampleout=subsampleout,$
                  subsamplefac=subsamplefac,$
                  wavesub=wavesub,$
-                 datext=datext,varext=varext,dqext=dqext,$
+                 datext=datext,varext=varext,dqext=dqext
 
 
    bad=1d99
