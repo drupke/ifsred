@@ -102,11 +102,16 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
       endif
       create=0b
    endelse
-   if ~ keyword_set(waveext) then waveext=0
+
    if ~ keyword_set(invvar) then invvar=0
    header=1b
-   cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext,$
-                        waveext=waveext,invvar=invvar,header=header)
+   if ~ keyword_set(waveext) then begin
+      cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext,$
+                           invvar=invvar,header=header)
+   endif else begin
+      cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext,$
+                           waveext=waveext,invvar=invvar,header=header)
+   endelse
    dx = cube.ncols
    dy = cube.nrows
 
@@ -114,12 +119,17 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
       map_x = rebin(dindgen(dx) + 1d,dx,dy)
       map_y = rebin(transpose(dindgen(dy) + 1d),dx,dy)
       if keyword_set(spaxlist) then begin
-         isum = []
-         for i=0,n_elements(spaxlist[*,0])-1 do begin
-            itmp = where(map_x eq spaxlist[i,0] AND $
-                         map_y eq spaxlist[i,1])
-            isum = [isum,itmp]
-         endfor
+         if size(spaxlist,/n_dimensions) eq 1 then begin
+            isum = where(map_x eq spaxlist[0] AND $
+                         map_y eq spaxlist[1])
+         endif else begin
+            isum = []
+            for i=0,n_elements(spaxlist[*,0])-1 do begin
+               itmp = where(map_x eq spaxlist[i,0] AND $
+                            map_y eq spaxlist[i,1])
+               isum = [isum,itmp]
+            endfor
+         endelse
       endif else begin
          if n_elements(sumpar) eq 3 then begin
 ;           Circular aperture
@@ -198,7 +208,7 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    endfor      
 
 ;   fxhmake,outhead,/extend,/date
-
+   
    if ~ keyword_set(nophu) then $
       fxhmake,outhead,outdat,/xtension,/date $
    else $
