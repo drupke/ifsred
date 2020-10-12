@@ -93,9 +93,10 @@ pro ifsr_kcwisatcor,inraw,indat,inrep,minrepval,usebackup=usebackup,$
 ;     to see if pixels near saturated point mistaken for CR. 
 ;     Replace these points as well.
       crpad = 4
+      s = size(rawdatuse,/dimensions)
 
       for i=0,ctbad-1 do begin
-         if ((iarrbad[0,i] ge crpad)&&(iarrbad[0,i] le s[1]-crpad))>0 then begin
+         if ((iarrbad[0,i] ge crpad)&&(iarrbad[0,i] le s[0]-crpad))>0 then begin
             mskdat_tmp = mskdat[iarrbad[0,i]-crpad:iarrbad[0,i]+crpad,iarrbad[1,i]]
             icr = where(mskdat_tmp eq 4,ctcr)
 
