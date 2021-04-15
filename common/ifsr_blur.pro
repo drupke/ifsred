@@ -12,12 +12,13 @@
 ;      Filenames for data cubes of individual exposures.
 ;    outfile: in, required, type=string
 ;      Path and filename of output file.
+;    fwhm_gaussian: in, required, type=double
+;      FWHM of Gaussian with which to convolve, in pixels.
 ;
 ; :Keywords:
 ;    nophu: in, optional, type=byte
 ;      Added flag to indicate that the 0th extension contains the data, not
 ;      the PHU.
-;    osiris: in, optional, type=byte
 ;
 ; :Author:
 ;    David S. N. Rupke::
