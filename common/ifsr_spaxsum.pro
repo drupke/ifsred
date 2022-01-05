@@ -24,7 +24,10 @@
 ;      keyword SPAXLIST set.
 ;      
 ; :Keywords:
-;    invvar: in, optional, type=byte
+;    exact: in, optional, type=boolean
+;      If set and aperture is circular, compute and apply fractional pixel area
+;      using exact circular region. Mirrors logic from ASTROLIB routine APER.PRO.
+;    invvar: in, optional, type=boolean
 ;      Set if the data cube holds inverse variance instead of variance. The
 ;      output structure will still contain the variance.
 ;    rotpa: in, optional, type=double
@@ -58,10 +61,12 @@
 ;      2018feb08, DSNR, added WAVEEXT and INVVAR keywords
 ;      2019jun28, DSNR, added SPAXAREA keyword
 ;      2019jul08, DSNR, added ROTPA and ROTCENT keywords
-;      2020may05, DSNR, added ability to sum 2D images; added CUNIT1 and BUNIT to outputs
+;      2020may05, DSNR, added ability to sum 2D images; 
+;        added CUNIT1 and BUNIT to outputs
+;      2021dec07, DSNR, option to compute EXACT circular aperture
 ;
 ; :Copyright:
-;    Copyright (C) 2015--2020 David S. N. Rupke
+;    Copyright (C) 2015--2021 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -81,7 +86,7 @@
 pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
                  nophu=nophu,ignorepar=ignorepar,reversevardq=reversevardq,$
                  waveext=waveext,invvar=invvar,spaxarea=spaxarea,rotpa=rotpa,$
-                 rotcent=rotcent
+                 rotcent=rotcent,exact=exact
                  
    if keyword_set(nophu) then begin
       datext=-1
@@ -116,8 +121,10 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    dy = cube.nrows
 
    if dy gt 1 then begin
+      ; map of x- and y-coordinates, single-offset
       map_x = rebin(dindgen(dx) + 1d,dx,dy)
       map_y = rebin(transpose(dindgen(dy) + 1d),dx,dy)
+      fracmask = dblarr(dx,dy)
       if keyword_set(spaxlist) then begin
          if size(spaxlist,/n_dimensions) eq 1 then begin
             isum = where(map_x eq spaxlist[0] AND $
@@ -133,9 +140,29 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
       endif else begin
          if n_elements(sumpar) eq 3 then begin
 ;           Circular aperture
-            map_r = sqrt((map_x - double(sumpar[0]))^2d + $
-                         (map_y - double(sumpar[1]))^2d)
-            isum = where(map_r le double(sumpar[2]))
+            map_x_wrt_cent = abs(map_x - double(sumpar[0]))
+            map_y_wrt_cent = abs(map_y - double(sumpar[1]))
+            map_r = sqrt(map_x_wrt_cent^2d + map_y_wrt_cent^2d)
+            if keyword_set(exact) then begin
+               ; Pixels fully in aperture, with fracmask = 1
+               smallrad = sumpar[2]/sqrt(2d) - 0.5d
+               igood = where(map_x_wrt_cent lt smallrad AND $
+                  map_y_wrt_cent lt smallrad, ctgood)
+               if ctgood GT 0 then fracmask[igood] = 1.0
+               ; Pixels fully out of aperture, with fracmask = -1
+               bigrad = sumpar[2] + 0.5d
+               ibad = where(map_x_wrt_cent gt bigrad OR $
+                  map_y_wrt_cent GT bigrad)
+               fracmask[ibad] = -1
+               ; Other pixels, for which to compute the fraction 0 < frac < 1
+               ifrac = where(fracmask EQ 0d, ctfrac)
+               if ctfrac GT 0 then fracmask[ifrac] = $
+                  pixwt(double(sumpar[0]),double(sumpar[1]),double(sumpar[2]),$
+                  map_x[ifrac],map_y[ifrac]) > 0d
+               isum = where(fracmask gt 0d,nsum)
+            endif else begin               
+               isum = where(map_r le double(sumpar[2]),nsum)
+            endelse
          endif else if n_elements(sumpar) eq 4 then begin
 ;           Square aperture
             isumx = where(map_x ge double(sumpar[0]) AND $
@@ -168,7 +195,26 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
       end else message,'Number of elements in IGNOREPAR must be 3 or 4.'
       isum = cgsetdifference(isum,iignore)
    endif
-   
+
+   if ~ keyword_set(exact) then fracmask[isum] = 1d $
+   else if keyword_set(ignorepar) then fracmask[iignore] = 0d
+
+;  plot image, fracmask, and aperture
+;  white -> fracmask = 1
+;  black -> fracmask = 0
+;  grey -> 0 < fracmask < 1
+   set_plot,'x'
+   cgdisplay,aspect=double(dy)/double(dx)
+   cgimage,bytscl(fracmask,min=0,max=1),pos=[0.05,0.05,0.95,0.95],backg='Black'
+   cgplot,[0],[0],/nodata,xran=[0.5,double(dx)+0.5],$
+      pos=[0.05,0.05,0.95,0.95],yran=[0.5,double(dy)+0.5],/noerase,$
+      axiscolor='White',ticklen=1d
+;  aperture
+   if n_elements(sumpar) eq 3 then $
+      tvcircle,sumpar[2],sumpar[0],sumpar[1],color='Red',thick=2
+   ;tvcircle,0.2d,sumpar[0],sumpar[1],color='Red',thick=2
+
+   ; optional weights
    if ~ keyword_set(weights) then weights=dblarr(n_elements(isum))+1d
    
    outdat=dblarr(cube.nz)
@@ -200,9 +246,9 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
          outdqtmp = rot(outdqtmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,$
                          /pivot)
       endif
-      outdat[i] = total(outdattmp[isum]*weights)*fluxmult
+      outdat[i] = total(outdattmp[isum]*weights*fracmask[isum])*fluxmult
 ; I *think* dat/err should not change when going from S.B. to flux . ..
-      outvar[i] = total(outvartmp[isum]*weights)*fluxmult^2d
+      outvar[i] = total(outvartmp[isum]*weights*fracmask[isum])*fluxmult^2d
       outdq[i] = total(outdqtmp[isum]*weights)
       if outdq[i] gt 0b then outdq[i] = 1b
    endfor      
