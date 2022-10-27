@@ -10,6 +10,9 @@
 ; median-combined. The DQ plane is applied after interpolation but
 ; before median-combining.
 ;
+; The new grid has the common reference coordinate (XPEAK, YPEAK) centered on
+; a spaxel. The 
+;
 ; :Categories:
 ;    IFSRED
 ;
@@ -27,6 +30,9 @@
 ;      Path and filename of output file.
 ;
 ; :Keywords:
+;    crpix: in, optional, type=dblarr(2)
+;    crval: in, optional, type=dblarr(2)
+;      Directly set spatial reference point of WCS for output image.
 ;    indir: in, optional, type=string
 ;      Directory where input files are located.
 ;    nocenter: in, optional, type=byte
@@ -37,6 +43,8 @@
 ;      Added flag to indicate that the 0th extension contains the data, not
 ;      the PHU.
 ;    osiris: in, optional, type=byte
+;    refexp: in, optional, type=integer
+;      Reference exposure for header and spatial WCS
 ;      
 ;
 ; :Author:
@@ -59,9 +67,11 @@
 ;                       source not centered
 ;      2018nov04, DSNR, bug fix of variance computation. Was overestimating
 ;                       variance by factor of Nexp
+;      2022oct25, DSNR, better commenting of algorithm. Added handling of 
+;                       CRPIX, CRVAL, using reference exposure
 ;
 ; :Copyright:
-;    Copyright (C) 2014--2018 David S. N. Rupke
+;    Copyright (C) 2014--2022 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -78,12 +88,14 @@
 ;    http://www.gnu.org/licenses/.
 ;
 ;-
-pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
+pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
+   refexp=refexp,crpix=crpix,crval=crval
 
 ; Value for data outside the bounds of interpolation
   noval=-999d
 
   if not keyword_set(indir) then indir=''
+  if not keyword_set(refexp) then refexp=1
 
   nexp = n_elements(infiles)
   xcc = dblarr(nexp)
@@ -110,11 +122,10 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
      cube = ifsf_readcube(indir+infiles[i],header=header,/quiet,$
                           datext=datext,varext=varext,dqext=dqext)
 
-;    Set output header to header of first cube
-     if i eq 0 then outheader=header
+;    Set output header to reference exposure
+     if refexp eq i+1 then outheader=header
 
      if ~ keyword_set(nophu) then begin
-        writefits,outfile,cube.phu,outheader.phu
         pkheader = header.phu
         appenddat=1
      endif else begin
@@ -122,7 +133,7 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
         appenddat=0
      endelse
      
-;    Fitted galaxy center
+;    Fitted galaxy center in zero-offset coordinates
      xcc[i] = sxpar(pkheader,'XPEAK',/silent,count=ctx) - 1
      ycc[i] = sxpar(pkheader,'YPEAK',/silent,count=cty) - 1
      if ~ keyword_set(nophu) AND (ctx eq 0 OR cty eq 0) then begin
@@ -132,9 +143,19 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
         ycc[i] = sxpar(header.dat,'YPEAK','exposure'+string(i+1,format='(I0)'),$
                        /silent) - 1
      endif
-;    Residual from nearest integer pixel
+;    Residual from next lowest integer pixel
      xccd[i] = xcc[i] - floor(xcc[i])
      yccd[i] = ycc[i] - floor(ycc[i])
+     
+;    Get spatial WCS information. Assume spaxel sizes all the same
+     if refexp eq i+1 then begin
+        crval1 = sxpar(pkheader,'CRVAL1',/silent)
+        crpix1 = sxpar(pkheader,'CRPIX1',/silent)
+        crval2 = sxpar(pkheader,'CRVAL2',/silent)
+        crpix2 = sxpar(pkheader,'CRPIX2',/silent)
+        crpix1 -= xcc[i]
+        crpix2 -= ycc[i]
+     endif
 
 ;    Initialize arrays to hold all exposures, as well as some other 
 ;    intermediate arrays
@@ -146,10 +167,15 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
         datall = dblarr(cube.ncols,cube.nrows,cube.nz,nexp)
         varall = dblarr(cube.ncols,cube.nrows,cube.nz,nexp)
         dqall = dblarr(cube.ncols,cube.nrows,cube.nz,nexp)
+        ; 2d arrays to hold x values and y values from original exposure,
+        ; in zero-offset coordinates. These will be the coordinates of this
+        ; exposure in the new grid system.
         xarr = rebin(dindgen(cube.ncols),cube.ncols,nexp)
         yarr = rebin(dindgen(cube.nrows),cube.nrows,nexp)
+        ; Coordinates of the spaxels in this exposure with reference to peak
         xarrc = rebin(dindgen(cube.ncols),cube.ncols,nexp)
         yarrc = rebin(dindgen(cube.nrows),cube.nrows,nexp)
+        ; This is the new grid coordinate system.
         xnewarr = rebin(indgen(cube.ncols),cube.ncols,nexp)
         ynewarr = rebin(indgen(cube.nrows),cube.nrows,nexp)
      endif
@@ -176,16 +202,32 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
         dqall[*,*,0:nzuse-1-dpix,i] = cube.dq[*,*,dpix:nzuse-1]
      endelse
 
-;    Add in integer residual w.r.t. center
+     ; Add in non-integer part of galaxy center position to coordinates of this
+     ; exposure in the new grid coordinates. In these coordinates, peak is
+     ; at [XPEAK, YPEAK] - 1
+     ; e.g., if [XPEAK, YPEAK] = [23.42,28.08], then in these coordinates
+     ; it's [22.42, 27.08]
+     ; But actual x values are:
+     ; [0.42, ..., 21.42, 22.42, 23.42, ...]
      xarr[*,i] += xccd[i]
      yarr[*,i] += yccd[i]
+     ; Subtract peak coordinate from coordinates of this spaxel --
+     ; in these coordinates, peak is at [0,0].
+     ; But actual x values are
+     ; [..., -1.42, -0.42, 0.58, 1.58, ...]
      xarrc[*,i] -= xcc[i]
      yarrc[*,i] -= ycc[i]
+     ; New grid coordinate system, recentered near the reference peak. In these
+     ; coordinates, peak is at [XPEAK, YPEAK] - floor(XPEAK - 1, YPEAK - 1). So, e.g.,
+     ; [0.42, 0.08] if [XPEAK, YPEAK] = [23.42, 28.08].
+     ; But actual x values are:
+     ; [-22, ..., -1, 0, 1, ...]
      xnewarr[*,i] -= floor(xcc[i])
      ynewarr[*,i] -= floor(ycc[i])
 
   endfor
 
+  ; New x, y ranges. Pad with some additional columns / rows.
   newxran = double([round(min(xarrc))-1,round(max(xarrc))+1])
   newcols = fix(newxran[1]-newxran[0]+2)
   newyran = double([round(min(yarrc))-1,round(max(yarrc))+1])
@@ -194,7 +236,6 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
 ;; Enforce odd # of columns and rows
 ;  if not newcols then newcols+=1
 ;  if not newrows then newrows+=1
-
 ; Center galaxy in new grid ...
   if ~ keyword_set(nocenter) then begin
      coloff = round(double(newcols/2d))-1
@@ -206,10 +247,51 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
      coloff = -min(xnewarr)+2
      rowoff = -min(ynewarr)+2
   endelse
+  ; this adds in some integer offset to the new coordinate system in every
+  ; exposure.
   xnewarr += coloff
   ynewarr += rowoff
-  
+  crpix1 += coloff
+  crpix2 += rowoff
+  if keyword_set(crpix) then begin
+     crpix1 = crpix[0]
+     crpix2 = crpix[1]
+  endif
+  if keyword_set(crval) then begin
+     crval1 = crval[0]
+     crval2 = crval[1]
+  endif
 
+; Passing header structure to SXADDPAR won't update parameters. Something
+; about how structure tags get passed to procedure and returned/updated
+  pouthead=outheader.phu
+  douthead=outheader.dat
+  vouthead=outheader.var
+  qouthead=outheader.dq
+
+  if ~keyword_set(nophu) then begin
+     sxaddpar,pouthead,'CRPIX1',crpix1
+     sxaddpar,pouthead,'CRPIX2',crpix2
+     if keyword_set(crval) then begin
+        sxaddpar,pouthead,'CRVAL1',crval1
+        sxaddpar,pouthead,'CRVAL2',crval2
+     endif
+  endif
+  sxaddpar,douthead,'CRPIX1',crpix1
+  sxaddpar,douthead,'CRPIX2',crpix2
+  sxaddpar,vouthead,'CRPIX1',crpix1
+  sxaddpar,vouthead,'CRPIX2',crpix2
+  sxaddpar,qouthead,'CRPIX1',crpix1
+  sxaddpar,qouthead,'CRPIX2',crpix2
+  if keyword_set(crval) then begin
+     sxaddpar,douthead,'CRVAL1',crval1
+     sxaddpar,douthead,'CRVAL2',crval2
+     sxaddpar,vouthead,'CRVAL1',crval1
+     sxaddpar,vouthead,'CRVAL2',crval2
+     sxaddpar,qouthead,'CRVAL1',crval1
+     sxaddpar,qouthead,'CRVAL2',crval2
+  endif
+  
 ; Interpolating data to full grid and combining exposures.
 
 ; DATA
@@ -224,6 +306,18 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
 
   for i=0,nz0-1 do begin
      for j=0,nexp-1 do begin
+        ; What we do here is index each original array such that the center of 
+        ; each spaxel has a coordinate offset so that the peak reference gets shifted
+        ; to the center of a spaxel upon interpolation.
+        ; For xarr, when it indexes the original data array:
+        ; [0, ..., 21, 22, 23, ...]
+        ; But actual assigned x values are:
+        ; [0.42, ..., 21.42, 22.42, 23.42, ...]
+        ; in the new array, these correspond to
+        ; [-22, ..., -1, 0, 1, ...] + some offset. So coordinate 22.42 gets
+        ; mapped to coordinate 0 + some offset.
+        ; The new coordinate in the final pixel array will have a unity offset, 
+        ; of course.
         datnewall[xnewarr[*,j],ynewarr[*,j],i,j] = $
            interpolate(datall[*,*,i,j],$
                        xarr[*,j],yarr[*,j],$
@@ -255,7 +349,9 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
      endfor
   endfor
 
-  writefits,outfile,datnew,outheader.dat,append=appenddat
+  if ~keyword_set(nophu) then $
+     writefits,outfile,cube.phu,pouthead
+  writefits,outfile,datnew,douthead,append=appenddat
 
   datnewall=0
   datnew=0  
@@ -290,8 +386,9 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu
      endfor
   endfor
   
-  writefits,outfile,varnew,outheader.var,/append
-  writefits,outfile,dqnew,outheader.dq,/append
+
+  writefits,outfile,varnew,vouthead,/append
+  writefits,outfile,dqnew,qouthead,/append
 
   varnewall=0
   dqnewall=0

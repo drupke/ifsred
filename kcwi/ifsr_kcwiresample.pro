@@ -8,6 +8,9 @@
 ; :Returns:
 ;
 ; :Params:
+;   goodreg: in, required, type=dblarr(4)
+;     Spaxel region [x1,y1,x2,y2] to resample, in integer, unity-offset 
+;     coordinates.
 ;
 ; :Keywords:
 ;
@@ -23,9 +26,10 @@
 ;    ChangeHistory::
 ;      2018aug10  DSNR  created
 ;      2019mar28  DSNR  fixed resampling scale to keep constant total flux
+;      2022oct25  DSNR  now correct CRPIX1 and CRPIX2 for resampling and GOODREG
 ;
 ; :Copyright:
-;    Copyright (C) 2018--2019 David S. N. Rupke
+;    Copyright (C) 2018--2022 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -52,7 +56,7 @@ pro ifsr_kcwiresample,instr,outfile,goodreg
    slscl = sxpar(ihead,'SLSCL',/silent)*3600d
 
    datsize = size(dat)
-;  Sizes of x and y spaxel regions specified on commnand line
+;  Sizes of x and y spaxel regions specified on command line
    dx = goodreg[2]-goodreg[0]+1
    dy = goodreg[3]-goodreg[1]+1
    dz = datsize[3]
@@ -64,21 +68,21 @@ pro ifsr_kcwiresample,instr,outfile,goodreg
    newvar = dblarr(newdx,dy,dz)
    newmsk = dblarr(newdx,dy,dz)
 ;  positions in old y array.
-   yarr = dindgen(dx)+0.5
-;  positions in new yarr
-   newyarr = (dindgen(newdx)+0.5)*pxscl/slscl
+   xarr = dindgen(dx)+0.5
+;  positions in new xarr
+   newxarr = (dindgen(newdx)+0.5)*pxscl/slscl
    
    for i=0,dz-1 do begin
       for j=0,dy-1 do begin
          newdat[*,j,i] = $
             interpol(dat[goodreg[0]-1:goodreg[2]-1,goodreg[1]-1+j,i],$
-                     yarr,newyarr)*pxscl/slscl
+                     xarr,newxarr)*pxscl/slscl
          newvar[*,j,i] = $
             interpol(var[goodreg[0]-1:goodreg[2]-1,goodreg[1]-1+j,i],$
-                     yarr,newyarr)*pxscl/slscl
+                     xarr,newxarr)*pxscl/slscl
          newmsk[*,j,i] = $
             interpol(msk[goodreg[0]-1:goodreg[2]-1,goodreg[1]-1+j,i],$
-                     yarr,newyarr)
+                     xarr,newxarr)
       endfor
    endfor
 
@@ -104,6 +108,18 @@ pro ifsr_kcwiresample,instr,outfile,goodreg
       sxaddpar,mhead,'CD1_1',newcdx
       sxaddpar,mhead,'CD2_2',newcdy
    endif
+   
+   print,'IFSR_KCWIRESAMPLE: adjusting CRPIX1, CRPIX2 for GOODREG'
+   oldcrpixx = sxpar(ihead,'CRPIX1',/silent)
+   oldcrpixy = sxpar(ihead,'CRPIX2',/silent)
+   newcrpixx = (oldcrpixx-goodreg[0]+1)*double(newdx)/double(dx)
+   newcrpixy = (oldcrpixy-goodreg[1]+1)
+   sxaddpar,ihead,'CRPIX1',newcrpixx
+   sxaddpar,ihead,'CRPIX2',newcrpixy
+   sxaddpar,vhead,'CRPIX1',newcrpixx
+   sxaddpar,vhead,'CRPIX2',newcrpixy
+   sxaddpar,mhead,'CRPIX1',newcrpixx
+   sxaddpar,mhead,'CRPIX2',newcrpixy
 
    mwrfits,newdat,outfile,ihead,/create
    mwrfits,newvar,outfile,vhead

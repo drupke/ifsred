@@ -13,9 +13,6 @@
 ; :Params:
 ;    infile: in, required, type=string
 ;      Path and filename of input file.
-;    nophu: in, optional, type=byte
-;      Added flag to indicate that the 0th extension contains the data, not
-;      the PHU.
 ;    outfile: in, required, type=string
 ;      Path and filename of output file.
 ;    sumpar: in, required, type=dblarr(3 or 4)
@@ -26,6 +23,12 @@
 ; :Keywords:
 ;    bunit: in, optional, type=str
 ;      Set data header keyword to BUNIT. Set var header keyword to (BUNIT)**2.
+;    datext: in, optional, type=integer, default=1
+;      Extension # of data plane. Set to a negative number if the correct
+;      extension is 0, since an extension of 0 ignores the keyword.
+;    dqext: in, optional, type=integer, default=3
+;      Extension # of DQ plane. Set to a negative number if there is no DQ; DQ
+;      plane is then set to 0.
 ;    exact: in, optional, type=boolean
 ;      If set and aperture is circular, compute and apply fractional pixel area
 ;      using exact circular region. Mirrors logic from ASTROLIB routine APER.PRO.
@@ -50,6 +53,8 @@
 ;      rather than surface brightness.
 ;    spaxlist: in, optional, type=dblarr(Nspax,2)
 ;      List of spaxels to combine. If this is chosen, SUMPAR parameter is ignored.
+;    varext: in, optional, type=integer, default=2
+;      Extension # of variance plane.
 ;    waveext: in, optional, type=integer
 ;      The extention number of a wavelength array.
 ;    
@@ -79,6 +84,8 @@
 ;      2022jan27, DSNR, added FLUXSCALE, FLUXNORM, BUNIT parameters; 
 ;        changed BUNIT in variance  to replicate BUNIT in variance header, 
 ;        not data header; fixed small bug in setting outheaddat for case of PHU
+;      2022jul28, DSNR, removed NOPHU and added DATEXT, VAREXT, DQEXT; now
+;        handles case of absent VAR, DQ planes
 ;
 ; :Copyright:
 ;    Copyright (C) 2015--2022 David S. N. Rupke
@@ -99,30 +106,19 @@
 ;
 ;-
 pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
-                 nophu=nophu,ignorepar=ignorepar,reversevardq=reversevardq,$
+                 ignorepar=ignorepar,reversevardq=reversevardq,$
                  waveext=waveext,invvar=invvar,spaxarea=spaxarea,rotpa=rotpa,$
                  rotcent=rotcent,exact=exact,fluxscale=fluxscale,$
-                 fluxnorm=fluxnorm,bunit=bunit,_extra=_extra
+                 fluxnorm=fluxnorm,bunit=bunit,$
+                 datext=datext,varext=varext,dqext=dqext,_extra=_extra
                  
-   if keyword_set(nophu) then begin
-      datext=-1
-      varext=1
+   if ~ keyword_set(datext) then datext=1
+   if ~ keyword_set(varext) then varext=2
+   if ~ keyword_set(dqext) then dqext=3
+   if keyword_set(reversevardq) then begin
+      varext=3
       dqext=2
-      if keyword_set(reversevardq) then begin
-         varext=2
-         dqext=1
-      endif
-      create=1b
-   endif else begin
-      datext=1
-      varext=2
-      dqext=3
-      if keyword_set(reversevardq) then begin
-         varext=3
-         dqext=2
-      endif
-      create=0b
-   endelse
+   endif
 
    if ~ keyword_set(invvar) then invvar=0
    header=1b
@@ -133,6 +129,15 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
       cube = ifsf_readcube(infile,/quiet,datext=datext,varext=varext,dqext=dqext,$
                            waveext=waveext,invvar=invvar,header=header,_extra=_extra)
    endelse
+   ; check if var and dq were found
+   novar=0b
+   if n_elements(cube.var) eq 1 then $
+      if cube.var[0] eq -1 then $
+         novar=1b
+   nodq=0b
+   if n_elements(cube.dq) eq 1 then $
+      if cube.dq[0] eq -1 then $
+         nodq=1b
    dx = cube.ncols
    dy = cube.nrows
 
@@ -347,13 +352,13 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    for i=0,cube.nz-1 do begin
       if dy gt 1 then begin
          outdattmp = cube.dat[*,*,i]
-         outvartmp = cube.var[*,*,i]
-         outdqtmp = cube.dq[*,*,i]
+         if ~novar then outvartmp = cube.var[*,*,i]
+         if ~nodq then outdqtmp = cube.dq[*,*,i]
       endif else begin
 ;        This assumes dispersion is along rows
          outdattmp = cube.dat[i,*]
-         outvartmp = cube.var[i,*]
-         outdqtmp = cube.dq[i,*]
+         if ~novar then outvartmp = cube.var[i,*]
+         if ~nodq then outdqtmp = cube.dq[i,*]
       endelse
 ;     Documentation of ROT doesn't specify that rotation center
 ;     is in zero-offset coordinates but I tested it. Rotation can't be 
@@ -361,35 +366,38 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
 ;     if ROTCENT is the center of the image.
 ;     Do nearest-neighbor interpolation if it's a bad pixel mask.
       if keyword_set(rotpa) AND keyword_set(rotcent) then begin
-         outdattmp = rot(outdattmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,cubic=-0.5,$
-                         /pivot)
-         outvartmp = rot(outvartmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,cubic=-0.5,$
-                         /pivot)
-         outdqtmp = rot(outdqtmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,$
-                         /pivot)
+         outdattmp = $
+            rot(outdattmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,cubic=-0.5,/pivot)
+         if ~novar then outvartmp = $
+            rot(outvartmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,cubic=-0.5,/pivot)
+         if ~nodq then outdqtmp = $
+            rot(outdqtmp,rotpa,1d,rotcent[0]-1,rotcent[1]-1,/pivot)
       endif
       outdat[i] = total(outdattmp[isum]*weights*fracmask[isum])*fluxmult
 ; I *think* dat/err should not change when going from S.B. to flux . ..
-      outvar[i] = total(outvartmp[isum]*weights*fracmask[isum])*fluxmult^2d
-      outdq[i] = total(outdqtmp[isum]*weights)
-      if outdq[i] gt 0b then outdq[i] = 1b
+      if ~novar then $
+         outvar[i] = total(outvartmp[isum]*weights*fracmask[isum])*fluxmult^2d
+      if ~nodq then begin
+         outdq[i] = total(outdqtmp[isum]*weights)
+         if outdq[i] gt 0b then outdq[i] = 1b
+      endif
    endfor      
 
 ;   fxhmake,outhead,/extend,/date
    
    if keyword_set(fluxnorm) then begin
       outdat *= fluxnorm
-      outvar *= fluxnorm*fluxnorm
+      if ~novar then outvar *= fluxnorm*fluxnorm
    endif
    if keyword_set(fluxscale) then begin
       outdat /= fluxscale
-      outvar /= fluxscale*fluxscale
+      if ~novar then outvar /= fluxscale*fluxscale
    endif
    
-   if ~ keyword_set(nophu) then $
-      fxhmake,outheaddat,outdat,/xtension,/date $
+   if datext eq -1 then $
+      fxhmake,outheaddat,outdat,/extend,/date $
    else $
-      fxhmake,outheaddat,outdat,/extend,/date
+      fxhmake,outheaddat,outdat,/xtension,/date
    sxaddpar,outheaddat,'EXTNAME','SCI'
    sxaddpar,outheaddat,'DISPAXIS',1
    sxaddpar,outheaddat,'WCSDIM',1
@@ -403,39 +411,47 @@ pro ifsr_spaxsum,infile,outfile,sumpar,spaxlist=spaxlist,weights=weights,$
    else if cube.bunit ne '' then sxaddpar,outheaddat,'BUNIT',cube.bunit
    if keyword_set(fluxscale) then sxaddpar,outheaddat,'FLUXSCAL',fluxscale
    
-   fxhmake,outheadvar,outvar,/xtension,/date
-   sxaddpar,outheadvar,'EXTNAME','VAR'
-   sxaddpar,outheadvar,'DISPAXIS',1
-   sxaddpar,outheadvar,'WCSDIM',1
-   sxaddpar,outheadvar,'CTYPE1','LINEAR'
-   sxaddpar,outheadvar,'CRPIX1',cube.crpix
-   sxaddpar,outheadvar,'CRVAL1',cube.crval
-   sxaddpar,outheadvar,'CD1_1',cube.cdelt
-   sxaddpar,outheadvar,'CDELT1',cube.cdelt
-   if cube.cunit ne '' then sxaddpar,outheadvar,'CUNIT1',cube.cunit
-   if keyword_set(bunit) then sxaddpar,outheadvar,'BUNIT','('+bunit+')**2' $
-   else if cube.bunit_var ne '' then sxaddpar,outheadvar,'BUNIT_VAR',cube.bunit
-   if keyword_set(fluxscale) then sxaddpar,outheadvar,'FLUXSCAL',fluxscale*fluxscale
+   if ~novar then begin
+      fxhmake,outheadvar,outvar,/xtension,/date
+      sxaddpar,outheadvar,'EXTNAME','VAR'
+      sxaddpar,outheadvar,'DISPAXIS',1
+      sxaddpar,outheadvar,'WCSDIM',1
+      sxaddpar,outheadvar,'CTYPE1','LINEAR'
+      sxaddpar,outheadvar,'CRPIX1',cube.crpix
+      sxaddpar,outheadvar,'CRVAL1',cube.crval
+      sxaddpar,outheadvar,'CD1_1',cube.cdelt
+      sxaddpar,outheadvar,'CDELT1',cube.cdelt
+      if cube.cunit ne '' then sxaddpar,outheadvar,'CUNIT1',cube.cunit
+      if keyword_set(bunit) then sxaddpar,outheadvar,'BUNIT','('+bunit+')**2' $
+      else if cube.bunit_var ne '' then sxaddpar,outheadvar,'BUNIT_VAR',cube.bunit
+      if keyword_set(fluxscale) then sxaddpar,outheadvar,'FLUXSCAL',fluxscale*fluxscale
+   endif
 
-   fxhmake,outheaddq,outdq,/xtension,/date
-   sxaddpar,outheaddq,'EXTNAME','SCI'
-   sxaddpar,outheaddq,'DISPAXIS',1
-   sxaddpar,outheaddq,'WCSDIM',1
-   sxaddpar,outheaddq,'CTYPE1','LINEAR'
-   sxaddpar,outheaddq,'CRPIX1',cube.crpix
-   sxaddpar,outheaddq,'CRVAL1',cube.crval
-   sxaddpar,outheaddq,'CD1_1',cube.cdelt
-   sxaddpar,outheaddq,'CDELT1',cube.cdelt
-   if cube.cunit ne '' then sxaddpar,outheaddq,'CUNIT1',cube.cunit
+   if ~nodq then begin
+      fxhmake,outheaddq,outdq,/xtension,/date
+      sxaddpar,outheaddq,'EXTNAME','SCI'
+      sxaddpar,outheaddq,'DISPAXIS',1
+      sxaddpar,outheaddq,'WCSDIM',1
+      sxaddpar,outheaddq,'CTYPE1','LINEAR'
+      sxaddpar,outheaddq,'CRPIX1',cube.crpix
+      sxaddpar,outheaddq,'CRVAL1',cube.crval
+      sxaddpar,outheaddq,'CD1_1',cube.cdelt
+      sxaddpar,outheaddq,'CDELT1',cube.cdelt
+      if cube.cunit ne '' then sxaddpar,outheaddq,'CUNIT1',cube.cunit
+   endif
 
-   if ~ keyword_set(nophu) then mwrfits,[],outfile,header.phu,/create
+   ; create PHU if needed
+   if datext ne -1 then begin
+      mwrfits,[],outfile,header.phu,/create
+      create=0b
+   endif else create=1b
    mwrfits,outdat,outfile,outheaddat,create=create
    if keyword_set(reversevardq) then begin
-      mwrfits,outdq,outfile,outheaddq
-      mwrfits,outvar,outfile,outheadvar
+      if ~nodq then mwrfits,outdq,outfile,outheaddq
+      if ~novar then mwrfits,outvar,outfile,outheadvar
    endif else begin
-      mwrfits,outvar,outfile,outheadvar
-      mwrfits,outdq,outfile,outheaddq
+      if ~novar then mwrfits,outvar,outfile,outheadvar
+      if ~nodq then mwrfits,outdq,outfile,outheaddq
    endelse
    if keyword_set(waveext) then $
       mwrfits,cube.wave,outfile,header_wave

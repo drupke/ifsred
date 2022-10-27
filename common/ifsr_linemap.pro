@@ -4,6 +4,8 @@
 ;
 ; Open a FITS data cube, call IFSR_MAKELINEMAP to create a linemap,
 ; and write the linemap to disk.
+; 
+; For now, subsampling does not correctly adjust the WCS of the input image.
 ;
 ; :Categories:
 ;    IFSRED
