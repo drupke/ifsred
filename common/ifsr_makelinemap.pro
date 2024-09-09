@@ -37,9 +37,10 @@
 ;      2019mar04, DSNR, moved IFSR_MAKELINEMAP to separate file from IFSR_LINEMAP
 ;      2019may22, DSNR, keyword ALLOWNEG allows negative fluxes in computing 
 ;                       continuum region averages to subtract
+;      2024jan08, DSNR, ALLOWNEG now also allows good line regions to go neg
 ;
 ; :Copyright:
-;    Copyright (C) 2019 David S. N. Rupke
+;    Copyright (C) 2019--2024 David S. N. Rupke
 ;
 ;    This program is free software: you can redistribute it and/or
 ;    modify it under the terms of the GNU General Public License as
@@ -58,11 +59,17 @@
 ;-
 function ifsr_makelinemap,cube,wavesum,wavesub=wavesub,allowneg=allowneg
 
+   bad = 1d99
    ;  Get linemap
    linesum = ifsr_wavesum(cube,wavesum,/average,npix=npix,/applydq)
    linesumdat = linesum[*,*,0]
    linesumvar = linesum[*,*,1]
-   igdline = where(linesumdat gt 0,ctgdline)
+   if keyword_set(allowneg) then begin
+      igdline = where(linesumdat ne bad,ctgdline)
+   endif else begin
+      igdline = where(linesumdat gt 0,ctgdline)
+      print,'IFSR_MAKELINEMAP: Applying multipliers/subtractions to positive fluxes only.'
+   endelse
    ;  Subtract continuum if requested
    if keyword_set(wavesub) then begin
       subsumdat = dblarr(cube.ncols,cube.nrows)
@@ -93,7 +100,7 @@ function ifsr_makelinemap,cube,wavesum,wavesub=wavesub,allowneg=allowneg
       linesumdat[igdline] -= subsumdat[igdline]
       linesumvar[igdline] += subsumvar[igdline]
    endif
-   ;  ... and return to total flux rather than average per A. Also
+   ;  ... and return to flux density rather than average flux density per pixel. Also
    ;  multiply by dispersion to convert from flux/A to flux
    linesumdat[igdline] *= double(npix)*cube.cdelt
    linesumvar[igdline] *= double(npix)*cube.cdelt^2d

@@ -178,6 +178,9 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
         ; This is the new grid coordinate system.
         xnewarr = rebin(indgen(cube.ncols),cube.ncols,nexp)
         ynewarr = rebin(indgen(cube.nrows),cube.nrows,nexp)
+        ;
+        newncols = cube.ncols
+        newnrows = cube.nrows
      endif
 
 ;    Put everything on a common wavelength solution, if it is not already.
@@ -192,14 +195,22 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
         string(i,format='(I0)')+' does not line up in lambda space with ref. exp.' 
      dpix = dcrpix - dcrval
      nzuse = (cube.nz le nz0) ? cube.nz : nz0
+     ncolsuse = (cube.ncols le newncols) ? cube.ncols : newncols
+     nrowsuse = (cube.nrows le newnrows) ? cube.nrows : newnrows
      if dpix le 0 then begin
-        datall[*,*,abs(dpix):nzuse-1,i] = cube.dat[*,*,0:nzuse-1-abs(dpix)]
-        varall[*,*,abs(dpix):nzuse-1,i] = cube.var[*,*,0:nzuse-1-abs(dpix)]
-        dqall[*,*,abs(dpix):nzuse-1,i]  = cube.dq[*,*,0:nzuse-1-abs(dpix)]
+        datall[0:ncolsuse-1,0:nrowsuse-1,abs(dpix):nzuse-1,i] = $
+           cube.dat[0:ncolsuse-1,0:nrowsuse-1,0:nzuse-1-abs(dpix)]
+        varall[0:ncolsuse-1,0:nrowsuse-1,abs(dpix):nzuse-1,i] = $
+           cube.var[0:ncolsuse-1,0:nrowsuse-1,0:nzuse-1-abs(dpix)]
+        dqall[0:ncolsuse-1,0:nrowsuse-1,abs(dpix):nzuse-1,i] = $
+           cube.dq[0:ncolsuse-1,0:nrowsuse-1,0:nzuse-1-abs(dpix)]
      endif else begin
-        datall[*,*,0:nzuse-1-dpix,i] = cube.dat[*,*,dpix:nzuse-1]
-        varall[*,*,0:nzuse-1-dpix,i] = cube.var[*,*,dpix:nzuse-1]
-        dqall[*,*,0:nzuse-1-dpix,i] = cube.dq[*,*,dpix:nzuse-1]
+        datall[0:ncolsuse-1,0:nrowsuse-1,0:nzuse-1-dpix,i] = $
+           cube.dat[0:ncolsuse-1,0:nrowsuse-1,dpix:nzuse-1]
+        varall[0:ncolsuse-1,0:nrowsuse-1,0:nzuse-1-dpix,i] = $
+           cube.var[0:ncolsuse-1,0:nrowsuse-1,dpix:nzuse-1]
+        dqall[0:ncolsuse-1,0:nrowsuse-1,0:nzuse-1-dpix,i] = $
+           cube.dq[0:ncolsuse-1,0:nrowsuse-1,dpix:nzuse-1]
      endelse
 
      ; Add in non-integer part of galaxy center position to coordinates of this

@@ -93,14 +93,14 @@ function ifsr_wavesum,cube,wavesum,average=average,npix=npix,applydq=applydq
    outflux = dblarr(cube.ncols,cube.nrows)
    outvar = dblarr(cube.ncols,cube.nrows)+bad
    igddat = where(totnwavepix gt 0,ctgddat)
-;  Calculate average flux/A ...
+;  Calculate average flux density per spectral pixel
    if keyword_set(average) then begin
       outflux[igddat] = totflux[igddat] / double(totnwavepix[igddat])
       outvar[igddat] = totvar[igddat] / double(totnwavepix[igddat])
 ;  ... or make a correction for missing pixels. Note that this is *not* an 
 ;  interpolation.
    endif else begin
-;     Multiply by dispersion to convert from flux/A to flux
+;     Multiply by dispersion to convert from flux density to flux
       outflux[igddat] *= cube.cdelt
       outvar[igddat] *= cube.cdelt^2d
       outflux[igddat] *= double(maxwavepix)/double(totnwavepix[igddat])

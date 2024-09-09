@@ -88,21 +88,39 @@ pro ifsr_linemap,infile,outfile,wavesum,allowneg=allowneg,$
    linesum = ifsr_makelinemap(cube,wavesum,wavesub=wavesub,allowneg=allowneg)
 
 ;  Subsampling interpolation
+   outheaddat = header.dat
+   ;  Remove 3rd dimension in WCS
+   sxdelpar, outheaddat, $
+      ['CTYPE3','CUNIT3','CNAME3','CRVAL3','CRPIX3','CD1_3','CD2_3','CD3_1',$
+      'CD3_2','CD3_3','CDELT3']
+   sxaddpar,outheaddat,'WCSDIM',2
    if keyword_set(subsampleout) then begin
       if ~ keyword_set(subsamplefac) then subsamplefac=10d
       xresamp = (dindgen(cube.ncols*subsamplefac)-subsamplefac/2d + 0.5d)/subsamplefac
       yresamp = (dindgen(cube.nrows*subsamplefac)-subsamplefac/2d + 0.5d)/subsamplefac
       interp = interpolate(linesum.dat,xresamp,yresamp,/double,/grid,cubic=-0.5)
-      writefits,subsampleout,interp,header.dat
+      writefits,subsampleout,interp,outheaddat
    endif
 
    appenddat=0b
    if datext eq 1 then begin
-      writefits,outfile,[],header.phu
+      outheadphu = header.phu
+      sxdelpar, outheadphu, $
+         ['CTYPE3','CUNIT3','CNAME3','CRVAL3','CRPIX3','CD1_3','CD2_3','CD3_1',$
+         'CD3_2','CD3_3','CDELT3']
+      sxaddpar,outheadphu,'WCSDIM',2
+      writefits,outfile,[],outheadphu
       appenddat=1b
    endif
-   writefits,outfile,linesum.dat,header.dat,append=appenddat
-   writefits,outfile,linesum.var,header.var,/append
+   ;
+   writefits,outfile,linesum.dat,outheaddat,append=appenddat
+   
+   outheadvar = header.var
+   sxdelpar, outheadvar, $
+      ['CTYPE3','CUNIT3','CNAME3','CRVAL3','CRPIX3','CD1_3','CD2_3','CD3_1',$
+      'CD3_2','CD3_3','CDELT3']
+   sxaddpar,outheadvar,'WCSDIM',2
+   writefits,outfile,linesum.var,outheadvar,/append
    
 
 end

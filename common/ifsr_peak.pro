@@ -124,10 +124,18 @@ function ifsr_peak,filename,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
                    indrange[0]:indrange[1]]
    nlamuse = n_elements(wavsub)
 
-;  Zero out DQed or NANed data
-   ibad = where(dqsub eq 1 OR ~ finite(datsub))
-   datsub[ibad] = 0
-   varsub[ibad] = 0
+;  Zero out DQed or INF/NANed data
+   ibad = where(dqsub eq 1, ctbad)
+   if ctbad gt 0 then begin
+      datsub[ibad] = 0d
+      varsub[ibad] = 0d
+   endif
+   iinf = where(~ finite(datsub), ctinf)
+   if ctinf gt 0 then begin
+      datsub[iinf] = 0d
+      varsub[iinf] = 0d
+      dqsub[iinf] = 1
+   endif
 
 ;  Sum over wavelength space
    dlam = wavsub[1:nlamuse-1]-wavsub[0:nlamuse-2]
@@ -179,7 +187,7 @@ function ifsr_peak,filename,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
 
    if not keyword_set(quiet) then $
       print,'FPEAK/XPEAK/YPEAK/XFWHM/YFWHM = ',max(datsum),xc,yc,xfwhm,yfwhm,$
-         format='(A0,E8.2,D6.2,D6.2,D6.2,D6.2)'
+         format='(A0,E8.2,D8.2,D8.2,D6.2,D6.2)'
 
 ;
 ;; Re-write header with new XPEAK/YPEAK to new output file
