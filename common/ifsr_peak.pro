@@ -208,13 +208,13 @@ function ifsr_peak,filename,lamrange,circ=circ,indrange=indrange,quiet=quiet,$
      sxaddpar,newheader,'YFWHM',yfwhm,'Row FWHM of PSF fit (pixels)'
 
      if datext eq 1 then begin
-        writefits,outfile,cube.phu,newheader
-        writefits,outfile,cube.dat,header.dat,/append
+        mwrfits,cube.phu,outfile,newheader,/create
+        mwrfits,cube.dat,outfile,header.dat
      endif else begin
-        writefits,outfile,cube.dat,newheader
+        mwrfits,cube.dat,outfile,newheader,/create
      endelse
-     writefits,outfile,cube.var,header.var,/append
-     writefits,outfile,cube.dq,header.dq,/append
+     mwrfits,cube.var,outfile,header.var
+     mwrfits,cube.dq,outfile,header.dq
 
   endif
 

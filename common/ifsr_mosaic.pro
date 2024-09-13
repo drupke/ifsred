@@ -89,13 +89,14 @@
 ;
 ;-
 pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
-   refexp=refexp,crpix=crpix,crval=crval
+   refexp=refexp,crpix=crpix,crval=crval,quiet=quiet
 
 ; Value for data outside the bounds of interpolation
   noval=-999d
 
   if not keyword_set(indir) then indir=''
   if not keyword_set(refexp) then refexp=1
+  if not keyword_set(quiet) then quiet=1b
 
   nexp = n_elements(infiles)
   xcc = dblarr(nexp)
@@ -119,7 +120,7 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
         varext=2
         dqext=3
      endelse
-     cube = ifsf_readcube(indir+infiles[i],header=header,/quiet,$
+     cube = ifsf_readcube(indir+infiles[i],header=header,quiet=quiet,$
                           datext=datext,varext=varext,dqext=dqext)
 
 ;    Set output header to reference exposure
@@ -134,8 +135,8 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
      endelse
      
 ;    Fitted galaxy center in zero-offset coordinates
-     xcc[i] = sxpar(pkheader,'XPEAK',/silent,count=ctx) - 1
-     ycc[i] = sxpar(pkheader,'YPEAK',/silent,count=cty) - 1
+     xcc[i] = sxpar(pkheader,'XPEAK',silent=quiet,count=ctx) - 1
+     ycc[i] = sxpar(pkheader,'YPEAK',silent=quiet,count=cty) - 1
      if ~ keyword_set(nophu) AND (ctx eq 0 OR cty eq 0) then begin
 ;       Check science header if it's missing from PHU
         xcc[i] = sxpar(header.dat,'XPEAK','exposure'+string(i+1,format='(I0)'),$
@@ -149,10 +150,10 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
      
 ;    Get spatial WCS information. Assume spaxel sizes all the same
      if refexp eq i+1 then begin
-        crval1 = sxpar(pkheader,'CRVAL1',/silent)
-        crpix1 = sxpar(pkheader,'CRPIX1',/silent)
-        crval2 = sxpar(pkheader,'CRVAL2',/silent)
-        crpix2 = sxpar(pkheader,'CRPIX2',/silent)
+        crval1 = sxpar(pkheader,'CRVAL1',silent=quiet)
+        crpix1 = sxpar(pkheader,'CRPIX1',silent=quiet)
+        crval2 = sxpar(pkheader,'CRVAL2',silent=quiet)
+        crpix2 = sxpar(pkheader,'CRPIX2',silent=quiet)
         crpix1 -= xcc[i]
         crpix2 -= ycc[i]
      endif
@@ -190,9 +191,13 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
         'dispersions. IFSR_MOSAIC does not account for this.'
      dcrpix = cube.crpix - crpix0
      dcrval = round((cube.crval - crval0)/cdelt0)
-     ddcrval_fracdiff = abs(((cube.crval - crval0)/cdelt0 - dcrval)/dcrval)
-     if ddcrval_fracdiff ge 0.05d  then print,'WARNING: Exposure '+$
-        string(i,format='(I0)')+' does not line up in lambda space with ref. exp.' 
+     dcrval_fracdiff = (cube.crval - crval0)/cdelt0 - dcrval
+     ;ddcrval_fracdiff = abs(((cube.crval - crval0)/cdelt0 - dcrval)/dcrval)
+     if dcrval_fracdiff ge 0.05d  then print,'NOTE: Exposure '+$
+        string(i+1,format='(I0)')+' is offset in lambda zero-point by '+$
+        'fractional difference of '+string(dcrval_fracdiff,format='(D0.2)')+$
+        ' dispersion elements, w.r.t. the reference exposure. IFSR_MOSAIC'+$
+        ' does not account for this.'
      dpix = dcrpix - dcrval
      nzuse = (cube.nz le nz0) ? cube.nz : nz0
      ncolsuse = (cube.ncols le newncols) ? cube.ncols : newncols
@@ -361,8 +366,8 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
   endfor
 
   if ~keyword_set(nophu) then $
-     writefits,outfile,cube.phu,pouthead
-  writefits,outfile,datnew,douthead,append=appenddat
+     mwrfits,cube.phu,outfile,pouthead,/create,silent=quiet
+  mwrfits,datnew,outfile,douthead,create=~appenddat,silent=quiet
 
   datnewall=0
   datnew=0  
@@ -398,8 +403,8 @@ pro ifsr_mosaic,infiles,outfile,indir=indir,nocenter=nocenter,nophu=nophu,$
   endfor
   
 
-  writefits,outfile,varnew,vouthead,/append
-  writefits,outfile,dqnew,qouthead,/append
+  mwrfits,varnew,outfile,vouthead,silent=quiet
+  mwrfits,dqnew,outfile,qouthead,silent=quiet
 
   varnewall=0
   dqnewall=0
